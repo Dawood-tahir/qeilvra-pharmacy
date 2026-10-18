@@ -6,7 +6,7 @@ export function Dialog({ label, onClose, busy = false, children, fullScreen = fa
   useEffect(() => { const element = ref.current; const previous = document.activeElement as HTMLElement | null; const fallback = fallbackFocus?.current; element?.showModal(); return () => { element?.close(); if (previous?.isConnected && previous !== document.body && previous.getClientRects().length > 0) previous.focus(); else fallback?.focus(); }; }, [fallbackFocus]);
   return <dialog ref={ref} tabIndex={-1} aria-label={label} onKeyDown={(e) => {
     if (e.key !== "Tab") return;
-    const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex="0"]')).filter((element) => element.getClientRects().length > 0);
+    const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button,input,select,textarea,a[href],summary,[tabindex="0"]')).filter((element) => element.getClientRects().length > 0 && !element.matches(':disabled,[tabindex="-1"]'));
     if (!controls.length) { e.preventDefault(); e.currentTarget.focus(); return; }
     const first = controls[0], last = controls[controls.length - 1];
     if (e.shiftKey && (document.activeElement === first || document.activeElement === e.currentTarget)) { e.preventDefault(); last.focus(); }

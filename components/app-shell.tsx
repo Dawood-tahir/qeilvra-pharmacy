@@ -7,11 +7,12 @@ import {
   LayoutDashboard, ShoppingCart, Pill, Boxes, Truck, ContactRound, BarChart3,
   WalletCards, Users, Settings, Bell, Search, X, LogOut,
   AlertTriangle, MoreHorizontal, RotateCcw,
-  ScrollText,
+  ScrollText, ReceiptText,
 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { GlobalSearch } from "@/components/global-search";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { cn, getInitials } from "@/lib/utils";
 import type { StaffUser } from "@/lib/auth";
 
@@ -21,12 +22,14 @@ const ownerNav: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "POS / Sales", href: "/pos", icon: ShoppingCart },
   { label: "Inventory", href: "/medicines", icon: Pill },
+  { label: "Invoices", href: "/sales", icon: ReceiptText },
+  { label: "Returns", href: "/returns", icon: RotateCcw },
   { label: "Stock History", href: "/stock", icon: Boxes },
   { label: "Purchases", href: "/purchases", icon: Truck },
   { label: "Suppliers", href: "/suppliers", icon: ContactRound },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Expenses", href: "/expenses", icon: WalletCards },
-  { label: "Users", href: "/users", icon: Users },
+  { label: "Salespeople", href: "/users", icon: Users },
   { label: "Settings", href: "/settings", icon: Settings },
   { label: "Audit Log", href: "/audit", icon: ScrollText },
 ];
@@ -36,6 +39,7 @@ const salespersonNav: NavItem[] = [
   { label: "POS / Sales", href: "/pos", icon: ShoppingCart },
   { label: "Inventory", href: "/medicines", icon: Pill },
   { label: "Stock Alerts", href: "/alerts", icon: AlertTriangle },
+  { label: "My Invoices", href: "/sales", icon: ReceiptText },
   { label: "My Returns", href: "/returns", icon: RotateCcw },
   { label: "Settings", href: "/profile", icon: Settings },
 ];
@@ -72,7 +76,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
         <div className="p-6"><BrandMark light /></div>
         <nav className="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-3 py-2" aria-label="Primary navigation">
           {nav.map(({ href, label, icon: Icon }) => (
-            <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} className={cn("flex h-12 items-center gap-3 rounded-xl px-4 text-sm font-medium text-blue-100 transition hover:bg-white/10 hover:text-white", isActive(href) && "bg-blue-500/70 text-white shadow-sm ring-1 ring-white/20")}>
+            <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} aria-current={isActive(href) ? "page" : undefined} className={cn("flex h-12 items-center gap-3 rounded-xl px-4 text-sm font-medium text-blue-100 transition hover:bg-white/10 hover:text-white", isActive(href) && "bg-blue-500/70 text-white shadow-sm ring-1 ring-white/20")}>
               <Icon className="size-5" /><span>{label}</span>
             </Link>
           ))}
@@ -80,6 +84,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
         <div className="m-4 rounded-2xl border border-white/10 bg-white/8 p-4">
           <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-white/10 font-bold">Q</span><span><span className="block text-sm font-bold">Qeilvra</span><span className="block text-[10px] text-blue-200">Secure pharmacy operations</span></span></div>
         </div>
+        <form action="/auth/signout" method="post" className="px-4 pb-4"><Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10 hover:text-white"><LogOut /> Sign out</Button></form>
       </aside>
 
       <div className="min-w-0 lg:col-start-2">
@@ -114,16 +119,15 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
         <button onClick={() => setMoreOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold text-slate-500"><MoreHorizontal className="size-5" /><span>More</span></button>
       </nav>
 
-      {moreOpen && <div className="fixed inset-0 z-[70] bg-slate-950/40 lg:hidden" onMouseDown={(e) => { if (e.target === e.currentTarget) setMoreOpen(false); }}>
-        <div className="safe-bottom absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl">
-          <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
+      {moreOpen && <Dialog label="More tools" onClose={() => setMoreOpen(false)}>
+        <div className="safe-bottom">
           <div className="mb-4 flex items-center justify-between"><div><p className="font-bold">More</p><p className="text-xs text-slate-500">{staff.role === "owner" ? "Owner tools" : "Your workspace"}</p></div><Button variant="ghost" size="icon" onClick={() => setMoreOpen(false)} aria-label="Close"><X /></Button></div>
           <div className="grid grid-cols-2 gap-2">
             {nav.filter((item) => !mobilePrimary.some((mobile) => mobile.href === item.href)).map(({ href, label, icon: Icon }) => <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} onClick={() => setMoreOpen(false)} className="flex min-h-16 items-center gap-3 rounded-2xl border border-slate-200 p-3 font-semibold text-slate-700"><span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-700"><Icon /></span><span className="text-sm">{label}</span></Link>)}
           </div>
           <form action="/auth/signout" method="post" className="mt-3"><Button variant="outline" className="w-full text-red-600"><LogOut /> Sign out</Button></form>
         </div>
-      </div>}
+      </Dialog>}
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );

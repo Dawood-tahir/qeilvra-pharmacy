@@ -28,7 +28,12 @@ function parallelSql(db, text) {
 }
 try {
   if (!fs.existsSync(path.join(data, "PG_VERSION"))) run("initdb", ["-D", data, "-A", "trust", "-U", "postgres", "--no-locale", "-E", "UTF8"]);
-  try { run("pg_ctl", ["-D", data, "status"]); } catch { run("pg_ctl", ["-D", data, "-l", path.resolve(".local-test-db.log"), "-o", "-p " + port + " -h 127.0.0.1", "start"]); started = true; }
+  try { run("pg_ctl", ["-D", data, "status"]); } catch {
+    // A background postgres process can inherit captured pipe handles on Windows
+    // and leave execFileSync waiting after pg_ctl has already exited.
+    execFileSync(exe("pg_ctl"), ["-D", data, "-l", path.resolve(".local-test-db.log"), "-o", "-p " + port + " -h 127.0.0.1", "start"], { windowsHide: true, stdio: "ignore", timeout: 60000 });
+    started = true;
+  }
   const migrations = fs.readdirSync("supabase/migrations").sort();
   for (const legacy of [true, false]) {
     const db = "qeilvra_contract_" + process.pid + (legacy ? "_legacy" : "");
@@ -41,6 +46,7 @@ try {
     if (legacy) { file(db, "tests/database/legacy-after.sql"); console.log("PASS: legacy quantities, costs and history survive migration"); continue; }
     file(db, "tests/database/contracts.sql");
     file(db, "tests/database/edge-cases.sql");
+    file(db, "tests/database/supplier-receiving.sql");
     const sale = "set role authenticated; select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',false); begin; select * from public.checkout_sale(jsonb_build_array(jsonb_build_object('medicine_id',(select id from public.test_ids where label='syrup'),'unit_key','base','quantity',1)),'cash',150,0,gen_random_uuid()); select pg_sleep(0.4); commit;";
     const results = await Promise.all([parallelSql(db, sale), parallelSql(db, sale)]);
     assert.equal(results.filter((r) => r.code === 0).length, 1, JSON.stringify(results));

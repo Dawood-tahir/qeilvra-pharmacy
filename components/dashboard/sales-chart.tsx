@@ -7,7 +7,7 @@ export type TrendPoint = { sale_date: string; revenue: number; gross_profit: num
 
 export function SalesChart({ data }: { data: TrendPoint[] }) {
   return (
-    <div className="h-72 w-full" aria-label="Revenue and gross profit trend chart">
+    <div className="h-52 w-full min-w-0 sm:h-72" aria-label="Revenue and gross profit trend chart">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           <defs>

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { guidedMedicineSchema, receiveStockSchema } from "@/lib/guided-medicine";
 import { requireOwner } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { saveOutcomeUnknown } from "@/lib/save-result";
 
 
 function safeError(message: string, code?: string) {
@@ -23,7 +24,7 @@ export async function saveGuidedMedicineAction(id: string | null, input: unknown
   if (receipt && !receipt.success) return { ok: false as const, error: receipt.error.issues[0].message };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("save_guided_medicine", { p_id: id, p_data: parsed.data, p_stock: receipt?.data ?? null, p_key: requestKey });
-  if (error) return { ok: false as const, error: safeError(error.message, error.code) };
+  if (error) return { ok: false as const, uncertain: saveOutcomeUnknown(error.code), error: saveOutcomeUnknown(error.code) ? "Could not confirm the save. Retry the same entries to check their status." : safeError(error.message, error.code) };
   refreshInventory();
   return { ok: true as const, id: String(data.id), quantity: Number(data.quantity) };
 }
@@ -34,7 +35,7 @@ export async function receiveStockAction(id: string, input: unknown, requestKey:
   if (!z.uuid().safeParse(id).success || !z.uuid().safeParse(requestKey).success) return { ok: false as const, error: "Select a medicine and try again." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("receive_stock", { p_id: id, p_stock: parsed.data, p_key: requestKey });
-  if (error) return { ok: false as const, error: safeError(error.message, error.code) };
+  if (error) return { ok: false as const, uncertain: saveOutcomeUnknown(error.code), error: saveOutcomeUnknown(error.code) ? "Could not confirm the save. Retry the same stock receipt to check its status." : safeError(error.message, error.code) };
   refreshInventory();
   return { ok: true as const, id: String(data.id), quantity: Number(data.quantity) };
 }

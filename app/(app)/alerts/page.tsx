@@ -38,10 +38,10 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
     <main className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
       <p className="text-sm font-semibold text-blue-700">Inventory attention</p>
       <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">Stock alerts</h1>
-      <p className="mt-1 text-sm text-slate-500">Actionable availability and expiry warnings. Purchase costs are not shown.</p>
+      <p className="mt-1 text-sm text-slate-500">Choose a warning below, then open a medicine to check its stock and expiry.</p>
       <div className="scrollbar-thin mt-5 flex gap-2 overflow-x-auto">
         {tabs.map((tab) => (
-          <Link key={tab.id} href={`/alerts?filter=${tab.id}`} className={cn("shrink-0 rounded-xl border px-4 py-2.5 text-sm font-semibold", selected === tab.id ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-600")}>{tab.label}</Link>
+          <Link key={tab.id} aria-current={selected === tab.id ? "page" : undefined} href={`/alerts?filter=${tab.id}`} className={cn("shrink-0 rounded-xl border px-4 py-2.5 text-sm font-semibold", selected === tab.id ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-600")}>{tab.label}</Link>
         ))}
       </div>
       <Card className="mt-4">

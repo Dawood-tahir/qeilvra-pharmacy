@@ -5,9 +5,11 @@ const server=await createServer({
  configFile:false, root:path.join(root,"tests/ui"), logLevel:"warn",
  resolve:{ alias:[
   { find:"@/app/(app)/medicines/actions",replacement:path.join(root,"tests/ui/actions.ts") },
+  ...["purchases", "returns", "expenses", "suppliers", "settings", "users", "stock"].map((name) => ({ find: "@/app/(app)/" + name + "/actions", replacement: path.join(root, "tests/ui/actions.ts") })),
   { find:"@/lib/auth",replacement:path.join(root,"tests/ui/auth.ts") },
   { find:"@/lib/supabase/server",replacement:path.join(root,"tests/ui/supabase.ts") },
   { find:"next/link",replacement:path.join(root,"tests/ui/link.tsx") },
+  { find:"next/navigation",replacement:path.join(root,"tests/ui/navigation.ts") },
   { find:"@",replacement:root },
  ] },
  esbuild:{jsx:"automatic"},
