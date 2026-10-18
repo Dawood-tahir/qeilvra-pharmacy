@@ -4,8 +4,8 @@ const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
     publishableKey &&
-    !supabaseUrl.includes("your-project") &&
-    !publishableKey.includes("replace_me"),
+    !supabaseUrl.toLowerCase().includes("your_project") && !supabaseUrl.includes("your-project") &&
+    !publishableKey.includes("replace_me") && !publishableKey.includes("YOUR_PUBLISHABLE_KEY"),
 );
 
 export function getPublicSupabaseEnv() {

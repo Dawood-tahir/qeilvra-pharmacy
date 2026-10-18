@@ -1,0 +1,1 @@
+export async function createClient() { return {rpc:async(name:string,args:Record<string,unknown>)=>{const response=await fetch("/__test/inventory?"+new URLSearchParams(Object.fromEntries(Object.entries(args).map(([k,v])=>[k,String(v)]))));return {data:await response.json(),error:null};}}; }

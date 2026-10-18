@@ -6,5 +6,5 @@ export const metadata: Metadata = { title: "POS / Sales" };
 
 export default async function PosPage() {
   const staff = await requireStaff();
-  return <PosWorkspace role={staff.role} />;
+  return <PosWorkspace role={staff.role} staffId={staff.id} />;
 }

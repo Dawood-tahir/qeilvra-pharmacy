@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 const purchaseSchema = z.object({
   supplier_id: z.uuid(), supplier_invoice_number: z.string().trim().max(120).default(""),
   invoice_date: z.iso.date(), discount: z.coerce.number().min(0).default(0), notes: z.string().trim().max(1000).default(""),
-  items: z.array(z.object({ medicine_id: z.uuid(), batch_number: z.string().trim().min(1).max(80), expiry_date: z.iso.date(), quantity: z.coerce.number().positive(), unit_cost: z.coerce.number().min(0) })).min(1).max(100),
+  items: z.array(z.object({ medicine_id: z.uuid(), batch_number: z.string().trim().min(1).max(80), expiry_date: z.iso.date(), quantity: z.coerce.number().int().positive(), unit_key: z.enum(["base", "strip", "box"]), unit_cost: z.coerce.number().min(0) })).min(1).max(100),
 });
 
 export async function createPurchaseAction(input: unknown) {

@@ -20,8 +20,8 @@ type NavItem = { label: string; href: string; icon: typeof LayoutDashboard };
 const ownerNav: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "POS / Sales", href: "/pos", icon: ShoppingCart },
-  { label: "Medicines", href: "/medicines", icon: Pill },
-  { label: "Stock Management", href: "/stock", icon: Boxes },
+  { label: "Inventory", href: "/medicines", icon: Pill },
+  { label: "Stock History", href: "/stock", icon: Boxes },
   { label: "Purchases", href: "/purchases", icon: Truck },
   { label: "Suppliers", href: "/suppliers", icon: ContactRound },
   { label: "Reports", href: "/reports", icon: BarChart3 },
@@ -34,7 +34,7 @@ const ownerNav: NavItem[] = [
 const salespersonNav: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "POS / Sales", href: "/pos", icon: ShoppingCart },
-  { label: "Medicines", href: "/medicines", icon: Pill },
+  { label: "Inventory", href: "/medicines", icon: Pill },
   { label: "Stock Alerts", href: "/alerts", icon: AlertTriangle },
   { label: "My Returns", href: "/returns", icon: RotateCcw },
   { label: "Settings", href: "/profile", icon: Settings },
@@ -51,7 +51,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
   const mobilePrimary = useMemo(() => [
     { label: "Home", href: "/dashboard", icon: LayoutDashboard },
     { label: "POS", href: "/pos", icon: ShoppingCart },
-    { label: "Medicines", href: "/medicines", icon: Pill },
+    { label: "Inventory", href: "/medicines", icon: Pill },
     { label: "Alerts", href: "/alerts", icon: AlertTriangle },
   ], []);
 
@@ -72,7 +72,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
         <div className="p-6"><BrandMark light /></div>
         <nav className="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-3 py-2" aria-label="Primary navigation">
           {nav.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className={cn("flex h-12 items-center gap-3 rounded-xl px-4 text-sm font-medium text-blue-100 transition hover:bg-white/10 hover:text-white", isActive(href) && "bg-blue-500/70 text-white shadow-sm ring-1 ring-white/20")}>
+            <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} className={cn("flex h-12 items-center gap-3 rounded-xl px-4 text-sm font-medium text-blue-100 transition hover:bg-white/10 hover:text-white", isActive(href) && "bg-blue-500/70 text-white shadow-sm ring-1 ring-white/20")}>
               <Icon className="size-5" /><span>{label}</span>
             </Link>
           ))}
@@ -90,7 +90,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
               <Search className="size-4" /><span className="truncate">Search medicines, invoices…</span><kbd className="ml-auto rounded border bg-white px-2 py-0.5 text-[10px] text-slate-400">Ctrl K</kbd>
             </button>
             <button onClick={() => setSearchOpen(true)} className="ml-auto grid size-10 place-items-center rounded-xl text-slate-600 hover:bg-slate-100 sm:hidden" aria-label="Search"><Search /></button>
-            <Link href="/notifications" className="relative grid size-10 place-items-center rounded-xl text-slate-600 hover:bg-slate-100" aria-label="Notifications"><Bell className="size-5" /></Link>
+            <Link prefetch={pathname === "/pos" ? false : null} href="/notifications" className="relative grid size-10 place-items-center rounded-xl text-slate-600 hover:bg-slate-100" aria-label="Notifications"><Bell className="size-5" /></Link>
             <div className="hidden h-8 w-px bg-slate-200 sm:block" />
             <div className="flex items-center gap-2">
               <span className="grid size-9 place-items-center rounded-full bg-blue-600 text-xs font-bold text-white">{getInitials(staff.fullName)}</span>
@@ -109,7 +109,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
         {mobilePrimary.map(({ href, label, icon: Icon }) => {
           const allowed = nav.some((item) => item.href === href) || href === "/alerts";
           if (!allowed) return null;
-          return <Link key={href} href={href} className={cn("flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold text-slate-500", isActive(href) && "text-blue-700")}><Icon className={cn("size-5", isActive(href) && "fill-blue-100")} /><span>{label}</span></Link>;
+          return <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} className={cn("flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold text-slate-500", isActive(href) && "text-blue-700")}><Icon className={cn("size-5", isActive(href) && "fill-blue-100")} /><span>{label}</span></Link>;
         })}
         <button onClick={() => setMoreOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold text-slate-500"><MoreHorizontal className="size-5" /><span>More</span></button>
       </nav>
@@ -119,7 +119,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
           <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
           <div className="mb-4 flex items-center justify-between"><div><p className="font-bold">More</p><p className="text-xs text-slate-500">{staff.role === "owner" ? "Owner tools" : "Your workspace"}</p></div><Button variant="ghost" size="icon" onClick={() => setMoreOpen(false)} aria-label="Close"><X /></Button></div>
           <div className="grid grid-cols-2 gap-2">
-            {nav.filter((item) => !mobilePrimary.some((mobile) => mobile.href === item.href)).map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMoreOpen(false)} className="flex min-h-16 items-center gap-3 rounded-2xl border border-slate-200 p-3 font-semibold text-slate-700"><span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-700"><Icon /></span><span className="text-sm">{label}</span></Link>)}
+            {nav.filter((item) => !mobilePrimary.some((mobile) => mobile.href === item.href)).map(({ href, label, icon: Icon }) => <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} onClick={() => setMoreOpen(false)} className="flex min-h-16 items-center gap-3 rounded-2xl border border-slate-200 p-3 font-semibold text-slate-700"><span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-700"><Icon /></span><span className="text-sm">{label}</span></Link>)}
           </div>
           <form action="/auth/signout" method="post" className="mt-3"><Button variant="outline" className="w-full text-red-600"><LogOut /> Sign out</Button></form>
         </div>

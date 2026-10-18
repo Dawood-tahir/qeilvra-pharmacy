@@ -16,7 +16,9 @@
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
     "bootstrap:owner": "node scripts/bootstrap-owner.mjs",
-    "bootstrap:initial-users": "node --env-file=.env.local scripts/seed-initial-users.mjs"
+    "bootstrap:initial-users": "node --env-file=.env.local scripts/seed-initial-users.mjs",
+    "test:database": "node scripts/test-database.mjs",
+    "test:workflows": "playwright test -c playwright.workflows.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

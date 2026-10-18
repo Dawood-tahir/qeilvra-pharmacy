@@ -1,19 +1,32 @@
 "use client";
-
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { LoaderCircle, SlidersHorizontal, X } from "lucide-react";
-import { adjustStockAction } from "@/app/(app)/stock/actions";
+import { correctStockAction } from "@/app/(app)/stock/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog } from "@/components/ui/dialog";
 
-export function AdjustStock({ batchId, medicine, batch, quantity }: { batchId: string; medicine: string; batch: string; quantity: number }) {
-  const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-  const submit = (formData: FormData) => startTransition(async () => {
-    const result = await adjustStockAction({ batchId, quantityDelta: formData.get("quantityDelta"), reason: formData.get("reason") });
-    if (!result.ok) { toast.error(result.error); return; }
-    toast.success(`Stock adjusted. New quantity: ${result.quantity}`); setOpen(false);
-  });
-  return <><Button variant="ghost" size="sm" onClick={() => setOpen(true)}><SlidersHorizontal /> Adjust</Button>{open && <div className="fixed inset-0 z-[80] grid place-items-end bg-slate-950/45 p-0 sm:place-items-center sm:p-4" onMouseDown={(e) => { if (e.target === e.currentTarget && !pending) setOpen(false); }}><div className="w-full rounded-t-3xl bg-white p-5 shadow-2xl sm:max-w-md sm:rounded-3xl sm:p-6"><div className="flex justify-between"><div><p className="text-xs font-bold text-blue-700">Stock correction</p><h2 className="mt-1 text-xl font-extrabold">{medicine}</h2><p className="mt-1 text-xs text-slate-500">Batch {batch} · current quantity {quantity}</p></div><Button variant="ghost" size="icon" onClick={() => setOpen(false)}><X /></Button></div><form action={submit} className="mt-5 space-y-4"><label className="block"><span className="mb-1.5 block text-sm font-semibold">Quantity change</span><Input name="quantityDelta" type="number" step="0.001" required autoFocus placeholder="e.g. -2 or 5" /><span className="mt-1 block text-xs text-slate-500">Use a negative number to remove stock.</span></label><label className="block"><span className="mb-1.5 block text-sm font-semibold">Reason *</span><textarea name="reason" required minLength={3} maxLength={500} className="min-h-24 w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Explain the physical count difference" /></label><Button className="w-full" size="lg" disabled={pending}>{pending ? <LoaderCircle className="animate-spin" /> : <SlidersHorizontal />} Record adjustment</Button><p className="text-center text-xs text-slate-500">This action is permanent and recorded in the audit log.</p></form></div></div>}</>;
+export function AdjustStock({ batchId, medicine, batch, quantity, unit = "unit" }: { batchId: string; medicine: string; batch: string; quantity: number; unit?: string }) {
+  const [open,setOpen]=useState(false);
+  const [count,setCount]=useState("");
+  const [reason,setReason]=useState("");
+  const [review,setReview]=useState(false);
+  const [error,setError]=useState("");
+  const [pending,startTransition]=useTransition();
+  function save() {
+    const actual=Number(count);
+    if(count==="" || !Number.isSafeInteger(actual) || actual<0) {setError("Enter the whole number of items you physically counted.");return;}
+    if(reason.trim().length<3) {setError("Explain why the recorded stock needs to change.");return;}
+    if(!review) {setReview(true);setError("");return;}
+    startTransition(async()=>{
+      try{
+        const result=await correctStockAction({batchId,countedQuantity:actual,expectedQuantity:quantity,reason});
+        if(!result.ok){setError(result.error);return;}
+        toast.success("Stock count saved. Available batch stock: "+result.quantity+" "+unit+"s.");
+        setOpen(false);setReview(false);
+      }catch{setError("The stock count could not be confirmed. Your entries are kept; try again.");}
+    });
+  }
+  return <><Button variant="ghost" size="sm" onClick={()=>{setOpen(true);setReview(false);setError("");}}><SlidersHorizontal/> Correct Stock</Button>{open&&<Dialog label="Correct Stock" busy={pending} onClose={()=>setOpen(false)}><div className="flex items-start justify-between gap-3"><div><h2 className="text-xl font-extrabold">Correct Stock</h2><p className="mt-1 text-sm font-bold">{medicine}</p><p className="mt-1 text-xs text-slate-500">Batch {batch} | recorded: {quantity} {unit}s</p></div><Button variant="ghost" size="icon" disabled={pending} aria-label="Close stock correction" onClick={()=>setOpen(false)}><X/></Button></div><form className="mt-5 space-y-4" onSubmit={(e)=>{e.preventDefault();if(!pending)save();}}><label className="block"><span className="mb-2 block text-sm font-semibold">How many {unit}s did you count?</span><Input autoFocus inputMode="numeric" type="number" min="0" step="1" value={count} disabled={review||pending} onChange={(e)=>setCount(e.target.value)}/></label><label className="block"><span className="mb-2 block text-sm font-semibold">Why does the stock need correcting?</span><textarea className="min-h-24 w-full rounded-xl border border-slate-200 p-3 text-sm" value={reason} disabled={review||pending} onChange={(e)=>setReason(e.target.value)} maxLength={500}/></label>{review&&<p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Change this batch from <strong>{quantity}</strong> to <strong>{count} {unit}s</strong>. This correction is recorded in the stock history.</p>}{error&&<p role="alert" className="text-sm text-red-700">{error}</p>}<div className="flex gap-2">{review&&<Button type="button" variant="outline" disabled={pending} onClick={()=>setReview(false)}>Back</Button>}<Button className="flex-1" disabled={pending}>{pending&&<LoaderCircle className="animate-spin"/>}{review?"Save Stock Count":"Review Stock Count"}</Button></div></form></Dialog>}</>;
 }

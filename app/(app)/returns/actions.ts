@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function requestReturnAction(input: unknown) {
   await requireStaff();
-  const parsed = z.object({ saleId: z.uuid(), reason: z.string().trim().min(3).max(500), items: z.array(z.object({ sale_item_id: z.uuid(), quantity: z.coerce.number().positive() })).min(1) }).safeParse(input);
+  const parsed = z.object({ saleId: z.uuid(), reason: z.string().trim().min(3).max(500), items: z.array(z.object({ sale_item_id: z.uuid(), quantity: z.coerce.number().int().positive() })).min(1) }).safeParse(input);
   if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0]?.message ?? "Check the return request." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("request_sale_return", { p_sale_id: parsed.data.saleId, p_items: parsed.data.items, p_reason: parsed.data.reason });
@@ -18,7 +18,7 @@ export async function requestReturnAction(input: unknown) {
 
 export async function reviewReturnAction(input: unknown) {
   await requireOwner();
-  const parsed = z.object({ returnId: z.uuid(), approve: z.boolean(), notes: z.string().trim().max(500).default(""), paymentMethod: z.enum(["cash", "card"]).default("cash"), items: z.array(z.object({ return_item_id: z.uuid(), approved_quantity: z.coerce.number().min(0), restockable: z.boolean() })).default([]) }).safeParse(input);
+  const parsed = z.object({ returnId: z.uuid(), approve: z.boolean(), notes: z.string().trim().max(500).default(""), paymentMethod: z.enum(["cash", "card"]).default("cash"), items: z.array(z.object({ return_item_id: z.uuid(), approved_quantity: z.coerce.number().int().min(0), restockable: z.boolean() })).default([]) }).safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Check the return review." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("review_sale_return", { p_return_id: parsed.data.returnId, p_approve: parsed.data.approve, p_items: parsed.data.items, p_review_notes: parsed.data.notes, p_payment_method: parsed.data.paymentMethod });

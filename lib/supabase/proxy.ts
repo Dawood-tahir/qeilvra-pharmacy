@@ -7,6 +7,7 @@ export async function updateSession(request: NextRequest) {
     const path = request.nextUrl.pathname;
     const publicPath = path.startsWith("/login") || path.startsWith("/forgot-password") || path.startsWith("/auth/") || path.startsWith("/_next") || path === "/favicon.ico";
     if (!publicPath) {
+      if (path.startsWith("/api/")) return NextResponse.json({ error: "Your session expired. Sign in again." }, { status: 401 });
       const urlTo = request.nextUrl.clone();
       urlTo.pathname = "/login";
       urlTo.searchParams.set("next", path);
@@ -35,6 +36,7 @@ export async function updateSession(request: NextRequest) {
   const isAuthPath = path.startsWith("/login") || path.startsWith("/forgot-password") || path.startsWith("/auth/");
 
   if (!user && !isAuthPath && !path.startsWith("/_next") && path !== "/favicon.ico") {
+    if (path.startsWith("/api/")) return NextResponse.json({ error: "Your session expired. Sign in again." }, { status: 401 });
     const urlTo = request.nextUrl.clone();
     urlTo.pathname = "/login";
     urlTo.searchParams.set("next", path);

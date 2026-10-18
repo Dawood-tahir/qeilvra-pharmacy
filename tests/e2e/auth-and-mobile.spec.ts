@@ -22,6 +22,7 @@ test.describe("configured authenticated flows", () => {
   });
 
   test("mobile navigation exposes counter workflow", async ({ page }) => {
+    test.skip((page.viewportSize()?.width ?? 0) >= 1024, "Mobile navigation applies below 1024px.");
     await expect(page.getByRole("navigation", { name: "Mobile navigation" })).toBeVisible();
     await expect(page.getByText("POS", { exact: true })).toBeVisible();
     await expect(page.getByText("Reports", { exact: true })).toHaveCount(0);
@@ -30,6 +31,7 @@ test.describe("configured authenticated flows", () => {
   test("mobile POS keeps cart checkout within reach", async ({ page }) => {
     await page.goto("/pos");
     await expect(page.getByLabel("Medicine search")).toBeVisible();
-    await expect(page.getByRole("button", { name: /View cart/i })).toBeVisible();
+    if ((page.viewportSize()?.width ?? 0) < 1024) await expect(page.getByRole("button", { name: /View cart|Cart & Checkout/i })).toBeVisible();
+    else await expect(page.getByRole("complementary", { name: "Cart" })).toBeVisible();
   });
 });

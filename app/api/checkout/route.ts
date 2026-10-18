@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const checkoutSchema = z.object({
   idempotencyKey: z.uuid(),
-  items: z.array(z.object({ medicineId: z.uuid(), quantity: z.number().positive().max(100000) })).min(1).max(100),
+  items: z.array(z.object({ medicineId: z.uuid(), quantity: z.number().int().positive().max(100000), unitKey: z.enum(["base", "strip", "box"]), expectedPrice: z.string().regex(/^\d+(\.\d{1,2})?$/) })).min(1).max(100),
   paymentMethod: z.enum(["cash", "card"]),
   tenderedAmount: z.number().nonnegative().nullable(),
   discount: z.number().nonnegative().default(0),
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Your session expired. Sign in again." }, { status: 401 });
   const { data, error } = await supabase.rpc("checkout_sale", {
-    p_items: parsed.data.items.map((item) => ({ medicine_id: item.medicineId, quantity: item.quantity })),
+    p_items: parsed.data.items.map((item) => ({ medicine_id: item.medicineId, quantity: item.quantity, unit_key: item.unitKey, expected_price: item.expectedPrice })),
     p_payment_method: parsed.data.paymentMethod,
     p_tendered_amount: parsed.data.tenderedAmount,
     p_discount: parsed.data.discount,
@@ -29,8 +29,8 @@ export async function POST(request: Request) {
     p_payment_reference: parsed.data.paymentReference ?? null,
   });
   if (error) {
-    const safeMessage = error.message.includes("Only ") || error.message.includes("expired") || error.message.includes("Discount") || error.message.includes("Cash received") ? error.message : "Checkout could not be completed. Stock and payment were not changed.";
-    return NextResponse.json({ error: safeMessage }, { status: error.code === "42501" ? 403 : 409 });
+    const safeMessage = error.message.includes("Only ") || error.message.includes("expired") || error.message.includes("Discount") || error.message.includes("Cash received") || error.message.includes("Selling prices changed") || error.message.includes("Owner must confirm") || error.message.includes("selling unit") ? error.message : "The sale could not be confirmed. Retry this sale to check its status.";
+    return NextResponse.json({ error: safeMessage }, { status: error.code === "42501" ? 403 : /^(P0001|22|23|40)/.test(error.code ?? "") ? 409 : 503 });
   }
   return NextResponse.json(Array.isArray(data) ? data[0] : data, { status: 201, headers: { "Cache-Control": "no-store" } });
 }

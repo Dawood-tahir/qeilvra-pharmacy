@@ -11,3 +11,8 @@ test-results/
 *.tsbuildinfo
 supabase/.branches/
 supabase/.temp/
+
+.local-test-db/
+.local-test-db.log
+
+.private/

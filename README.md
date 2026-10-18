@@ -9,6 +9,10 @@ It supports two roles only:
 
 There is no public registration and no customer-management module.
 
+## Inventory and POS update
+
+See [the audit](docs/INVENTORY-AUDIT.md) and [migration, backfill, and verification guide](docs/INVENTORY-IMPLEMENTATION.md) before rolling out the packaging changes. The Inventory screen now provides guided Add New Medicine and Add More Stock flows; POS supports independent tablet, strip, box and whole-item prices. Existing medicines require Owner packaging review.
+
 ## What is implemented
 
 - Cookie-based Supabase SSR authentication with fresh `auth.getUser()` checks.
@@ -68,7 +72,7 @@ Prerequisites: Node.js 22+, npm, Docker Desktop, and the Supabase CLI.
    npm run dev
    ```
 
-Open `http://localhost:3000` and sign in. Add medicine and expense categories in Settings, then add suppliers, medicines, and post a purchase before using POS.
+Open `http://localhost:3000` and sign in. Use Inventory ? Add New Medicine to enter identification, initial stock and selling prices together. Use Add More Stock for later batches. Supplier invoice purchases remain available in Purchases.
 
 ## Hosted Supabase setup
 
@@ -157,3 +161,5 @@ The Content Security Policy, anti-framing, MIME-sniffing, referrer, and browser-
 ## Production readiness boundary
 
 The codebase, migrations, RLS, test suites, and integration points are complete, but a production deployment is not considered verified until migrations and role tests pass against the target Supabase project, SMTP is configured, receipt hardware is tested, and the browser suite passes with real Owner/Salesperson accounts. No credentials or fabricated financial records are included.
+
+Hosted database release status and remaining on-site checks: [rollout report](docs/HOSTED-ROLLOUT.md).

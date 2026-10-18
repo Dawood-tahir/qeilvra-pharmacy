@@ -1,127 +1,160 @@
 "use client";
-
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { z } from "zod";
 import { toast } from "sonner";
-import {
-  Barcode, CheckCircle2, ChevronLeft, CreditCard, LoaderCircle, Minus, PackageX,
-  Plus, Printer, ReceiptText, Search, ShoppingBag, ShoppingCart, Trash2, X,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { CheckCircle2, CreditCard, LoaderCircle, Minus, Plus, Printer, Search, ShoppingCart, Trash2, X } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Dialog } from "@/components/ui/dialog";
 import { cn, formatCurrency } from "@/lib/utils";
+import { cartBaseQuantity, pluralUnit, toMinor, type StockMedicine, type SellingUnit } from "@/lib/medicine-units";
 import type { AppRole } from "@/lib/auth";
 
-type Medicine = { id: string; name: string; generic_name?: string; manufacturer?: string; strength?: string; dosage_form?: string; barcode?: string; sku: string; selling_price: number; base_unit: string; available_quantity: number; nearest_expiry?: string; stock_status: "in_stock" | "low_stock" | "out_of_stock" };
-type CartItem = Medicine & { quantity: number };
+type CartItem = StockMedicine & { quantity: number; unit: SellingUnit; lineKey: string };
 type SaleResult = { sale_id: string; invoice_number: string; net_total: number; change_amount: number };
+type CheckoutRequest = { idempotencyKey: string; items: { medicineId: string; unitKey: string; quantity: number; expectedPrice: string }[]; paymentMethod: "cash" | "card"; tenderedAmount: number | null; discount: number };
+const cartSchema = z.array(z.object({
+  id: z.string(), name: z.string(), strength: z.string().nullish(), base_unit: z.string(), quantity: z.number().int().positive(),
+  available_quantity: z.number(), lineKey: z.string(),
+  unit: z.object({ unit_key: z.string(), label: z.string(), base_quantity: z.number().int().positive(), selling_price: z.number().positive() }),
+}).passthrough());
 
-export function PosWorkspace({ role }: { role: AppRole }) {
+export function PosWorkspace({ role, staffId = "local" }: { role: AppRole; staffId?: string }) {
   const [query, setQuery] = useState("");
-  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [medicines, setMedicines] = useState<StockMedicine[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
+  const [method, setMethod] = useState<"cash" | "card">("cash");
   const [tendered, setTendered] = useState("");
   const [discount, setDiscount] = useState("0");
   const [processing, setProcessing] = useState(false);
+  const [request, setRequest] = useState<CheckoutRequest | null>(null);
   const [saleResult, setSaleResult] = useState<SaleResult | null>(null);
-  const idempotencyKey = useRef(crypto.randomUUID());
+  const [restored, setRestored] = useState(false);
+  const [searchVersion, setSearchVersion] = useState(0);
+  const [preferredUnits, setPreferredUnits] = useState<Record<string, string>>({});
   const searchRef = useRef<HTMLInputElement>(null);
-
-  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.selling_price * item.quantity, 0), [cart]);
-  const discountValue = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
-  const total = subtotal - discountValue;
-  const change = paymentMethod === "cash" ? Math.max((Number(tendered) || 0) - total, 0) : 0;
-  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-
-  const search = useCallback(async (term: string) => {
-    setLoading(true);
+  const busyRef = useRef(false);
+  const storageKey = "qeilvra-cart-v2-" + staffId;
+  const subtotalMinor = useMemo(() => cart.reduce((sum, item) => sum + toMinor(item.unit.selling_price) * item.quantity, 0), [cart]);
+  const discountMinor = Math.min(toMinor(discount), subtotalMinor);
+  const total = (subtotalMinor - discountMinor) / 100;
+  const change = method === "cash" ? Math.max(toMinor(tendered) - subtotalMinor + discountMinor, 0) / 100 : 0;
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+    if (!active) return;
     try {
-      const response = await fetch(`/api/medicines/search?q=${encodeURIComponent(term)}&limit=30`, { cache: "no-store" });
-      if (!response.ok) throw new Error();
-      setMedicines(await response.json());
-    } catch { toast.error("Medicine search failed. Check your connection and try again."); }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => search(query.trim()), query.trim() ? 220 : 0);
-    return () => clearTimeout(timer);
-  }, [query, search]);
-
-  useEffect(() => {
-    const keyHandler = (event: KeyboardEvent) => {
-      if (event.key === "F4") { event.preventDefault(); searchRef.current?.focus(); }
-      if (event.key === "Escape") { setPaymentOpen(false); setCartOpen(false); }
-    };
-    window.addEventListener("keydown", keyHandler);
-    return () => window.removeEventListener("keydown", keyHandler);
-  }, []);
-
-  const addItem = (medicine: Medicine) => {
-    if (medicine.available_quantity <= 0) { toast.error(`${medicine.name} is unavailable.`); return; }
-    setCart((current) => {
-      const existing = current.find((item) => item.id === medicine.id);
-      if (existing) {
-        if (existing.quantity + 1 > medicine.available_quantity) { toast.error(`Only ${medicine.available_quantity} units available.`); return current; }
-        return current.map((item) => item.id === medicine.id ? { ...item, quantity: item.quantity + 1 } : item);
-      }
-      return [...current, { ...medicine, quantity: 1 }];
+      const saved = JSON.parse(sessionStorage.getItem(storageKey) ?? "null");
+      const parsed = cartSchema.safeParse(saved?.cart);
+      if (parsed.success) { setCart(parsed.data as CartItem[]); setRequest(saved.request ?? null); setSaleResult(saved.saleResult ?? null); setDiscount(saved.discount ?? "0"); }
+      setPreferredUnits(JSON.parse(sessionStorage.getItem("qeilvra-unit-preferences-" + staffId) ?? "{}"));
+    } catch { /* An invalid or unavailable browser store must not prevent a sale. */ }
+    setRestored(true);
     });
-  };
-  const setQuantity = (id: string, quantity: number) => setCart((current) => current.flatMap((item) => {
-    if (item.id !== id) return [item];
-    if (quantity <= 0) return [];
-    if (quantity > item.available_quantity) { toast.error(`Only ${item.available_quantity} units available.`); return [item]; }
-    return [{ ...item, quantity }];
-  }));
-
-  const checkout = async () => {
-    if (!cart.length || processing) return;
-    if (paymentMethod === "cash" && (Number(tendered) || 0) < total) { toast.error("Cash received is less than the amount due."); return; }
-    setProcessing(true);
+    return () => { active = false; };
+  }, [storageKey, staffId]);
+  useEffect(() => {
+    if (restored) { try { sessionStorage.setItem(storageKey, JSON.stringify({ cart, request, saleResult, discount })); } catch { /* Counter still works when storage is unavailable. */ } }
+  }, [cart, request, saleResult, discount, restored, storageKey]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setLoading(true); setSearchError("");
+      try {
+        const response = await fetch("/api/medicines/search?q=" + encodeURIComponent(query.trim()) + "&limit=30", { signal: controller.signal, cache: "no-store" });
+        if (!response.ok) throw new Error();
+        setMedicines(await response.json());
+      } catch { if (!controller.signal.aborted) setSearchError("Could not load medicines. Check your connection and try again."); }
+      finally { if (!controller.signal.aborted) setLoading(false); }
+    }, query ? 220 : 0);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [query, searchVersion]);
+  useEffect(() => {
+    const listener = (e: KeyboardEvent) => { if (e.key === "F4") { e.preventDefault(); searchRef.current?.focus(); } };
+    window.addEventListener("keydown", listener); return () => window.removeEventListener("keydown", listener);
+  }, []);
+  function add(medicine: StockMedicine, unit: SellingUnit, quantity: number) {
+    if (request || processing) return;
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 100000) return;
+    if ((cart.find((l) => l.id === medicine.id && l.unit.unit_key === unit.unit_key)?.quantity ?? 0) + quantity > 100000) { toast.error("Use at most 100,000 items on one invoice line."); return; }
+    if (cartBaseQuantity(cart, medicine.id) + quantity * unit.base_quantity > medicine.available_quantity) { toast.error("Only " + pluralUnit(medicine.base_unit, medicine.available_quantity) + " are available, including items already in the cart."); return; }
+    const lineKey = medicine.id + ":" + unit.unit_key;
+    setCart((current) => {
+      const existing = current.find((line) => line.lineKey === lineKey);
+      return existing ? current.map((line) => line.lineKey === lineKey ? { ...line, quantity: line.quantity + quantity } : line) : [...current, { ...medicine, quantity, unit, lineKey }];
+    });
+    const next = { ...preferredUnits, [medicine.id]: unit.unit_key };
+    setPreferredUnits(next);
+    try { sessionStorage.setItem("qeilvra-unit-preferences-" + staffId, JSON.stringify(next)); } catch {}
+    toast.success(quantity + " " + unit.label + (quantity === 1 ? "" : "s") + " added to cart.");
+  }
+  function quantity(lineKey: string, count: number) {
+    if (request || processing || !Number.isSafeInteger(count)) return;
+    const line = cart.find((item) => item.lineKey === lineKey);
+    if (!line) return;
+    const available = medicines.find((m) => m.id === line.id)?.available_quantity ?? line.available_quantity;
+    if (cartBaseQuantity(cart.filter((item) => item.lineKey !== lineKey), line.id) + count * line.unit.base_quantity > available) { toast.error("Only " + pluralUnit(line.base_unit, available) + " are available."); return; }
+    setCart((current) => count <= 0 ? current.filter((line) => line.lineKey !== lineKey) : current.map((line) => line.lineKey === lineKey ? { ...line, quantity: count } : line));
+  }
+  async function checkout() {
+    if (!cart.length || busyRef.current) return;
+    if (!request && method === "cash" && toMinor(tendered) < subtotalMinor - discountMinor) return;
+    const payload: CheckoutRequest = request ?? { idempotencyKey: crypto.randomUUID(), items: cart.map((line) => ({ medicineId: line.id, unitKey: line.unit.unit_key, quantity: line.quantity, expectedPrice: Number(line.unit.selling_price).toFixed(2) })), paymentMethod: method, tenderedAmount: method === "cash" ? toMinor(tendered) / 100 : null, discount: discountMinor / 100 };
+    busyRef.current = true; setProcessing(true); setRequest(payload);
     try {
-      const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idempotencyKey: idempotencyKey.current, items: cart.map((item) => ({ medicineId: item.id, quantity: item.quantity })), paymentMethod, tenderedAmount: paymentMethod === "cash" ? Number(tendered) : null, discount: discountValue, customerName: null, paymentReference: null }) });
+      sessionStorage.setItem(storageKey, JSON.stringify({ cart, request: payload, discount }));
+    } catch {}
+    try {
+      const response = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Checkout failed.");
-      setSaleResult(result); setPaymentOpen(false); setCartOpen(false); toast.success("Sale completed and stock updated.");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Checkout failed. No changes were saved."); }
-    finally { setProcessing(false); }
-  };
-
-  const resetSale = () => { setCart([]); setQuery(""); setTendered(""); setDiscount("0"); setPaymentMethod("cash"); setSaleResult(null); idempotencyKey.current = crypto.randomUUID(); searchRef.current?.focus(); search(""); };
-
-  if (saleResult) return <main className="grid min-h-[calc(100vh-4rem)] place-items-center p-4"><Card className="w-full max-w-lg p-6 text-center sm:p-8"><span className="mx-auto grid size-16 place-items-center rounded-full bg-emerald-50 text-emerald-700"><CheckCircle2 className="size-9" /></span><p className="mt-5 text-sm font-semibold text-emerald-700">Payment successful</p><h1 className="mt-1 text-2xl font-extrabold">{saleResult.invoice_number}</h1><p className="mt-3 text-3xl font-extrabold tabular-nums">{formatCurrency(saleResult.net_total)}</p>{saleResult.change_amount > 0 && <p className="mt-2 text-sm text-slate-500">Change due: <strong className="text-slate-900">{formatCurrency(saleResult.change_amount)}</strong></p>}<div className="mt-7 grid gap-3 sm:grid-cols-2"><Link className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 font-semibold text-white hover:bg-blue-700" href={`/sales/${saleResult.sale_id}?print=thermal`}><Printer /> Print receipt</Link><Button variant="outline" size="lg" onClick={resetSale}><ShoppingCart /> Next sale</Button></div><Link href={`/sales/${saleResult.sale_id}`} className="mt-4 inline-block text-sm font-semibold text-blue-700">View standard invoice</Link></Card></main>;
-
-  return (
-    <main data-role={role} className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-[1600px] flex-col p-3 pb-28 sm:p-5 sm:pb-28 lg:h-[calc(100vh-4.5rem)] lg:flex-row lg:gap-4 lg:overflow-hidden lg:p-6">
-      <section className="flex min-w-0 flex-1 flex-col lg:overflow-hidden">
-        <div className="mb-3 flex items-center justify-between"><div><p className="text-xs font-bold text-blue-700">Point of Sale</p><h1 className="text-xl font-extrabold sm:text-2xl">New sale</h1></div><Badge variant="success">Live stock</Badge></div>
-        <div className="relative"><Search className="absolute left-3 top-3.5 size-5 text-slate-400" /><Input ref={searchRef} autoFocus value={query} onChange={(e) => setQuery(e.target.value)} className="h-12 pl-11 pr-12 text-base" placeholder="Search medicine, generic, barcode or SKU" aria-label="Medicine search" /><Barcode className="absolute right-3 top-3.5 size-5 text-blue-600" /></div>
-        <p className="mt-2 text-[11px] text-slate-500">Press F4 to focus search. Barcode scans work when the scanner sends Enter.</p>
-        <div className="scrollbar-thin mt-4 grid flex-1 auto-rows-min grid-cols-1 gap-2 overflow-y-auto pb-3 sm:grid-cols-2 xl:grid-cols-3">
-          {loading && medicines.length === 0 && Array.from({ length: 6 }).map((_, index) => <div key={index} className="skeleton h-32 rounded-2xl" />)}
-          {!loading && medicines.length === 0 && <div className="col-span-full grid min-h-64 place-items-center text-center"><div><PackageX className="mx-auto size-10 text-slate-300" /><p className="mt-3 font-bold">No sellable medicines found</p><p className="mt-1 text-sm text-slate-500">Try a name, generic name, barcode or SKU.</p></div></div>}
-          {medicines.map((medicine) => <button key={medicine.id} disabled={medicine.available_quantity <= 0} onClick={() => addItem(medicine)} className="group flex min-h-28 items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700"><ShoppingBag className="size-5" /></span><span className="min-w-0 flex-1"><span className="block truncate font-bold text-slate-950">{medicine.name}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{[medicine.strength, medicine.dosage_form, medicine.generic_name].filter(Boolean).join(" · ")}</span><span className="mt-3 flex items-end justify-between gap-2"><span className="text-base font-extrabold text-blue-700">{formatCurrency(medicine.selling_price)}</span><Badge variant={medicine.stock_status === "in_stock" ? "success" : medicine.stock_status === "low_stock" ? "warning" : "destructive"}>{medicine.available_quantity} in stock</Badge></span></span></button>)}
-        </div>
-      </section>
-
-      <aside className="hidden w-[390px] shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:flex"><CartPanel cart={cart} subtotal={subtotal} total={total} discount={discount} onDiscount={setDiscount} onQuantity={setQuantity} onCheckout={() => setPaymentOpen(true)} /></aside>
-
-      {cartOpen && <div className="fixed inset-0 z-[65] bg-white lg:hidden"><div className="flex h-full flex-col"><div className="flex h-16 items-center gap-3 border-b px-4"><Button variant="ghost" size="icon" onClick={() => setCartOpen(false)}><ChevronLeft /></Button><div><p className="font-bold">Current sale</p><p className="text-xs text-slate-500">{cartCount} units</p></div></div><CartPanel cart={cart} subtotal={subtotal} total={total} discount={discount} onDiscount={setDiscount} onQuantity={setQuantity} onCheckout={() => setPaymentOpen(true)} /></div></div>}
-
-      <div className="no-print safe-bottom fixed inset-x-0 bottom-[61px] z-40 border-t border-slate-200 bg-white p-3 shadow-[0_-6px_20px_rgba(15,23,42,.08)] lg:hidden"><button onClick={() => setCartOpen(true)} className="flex h-14 w-full items-center justify-between rounded-2xl bg-blue-600 px-4 text-white"><span className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-lg bg-white/15"><ShoppingCart className="size-5" /></span><span className="text-left"><span className="block text-sm font-bold">View cart</span><span className="block text-[10px] text-blue-100">{cartCount} units</span></span></span><span className="text-lg font-extrabold">{formatCurrency(total)}</span></button></div>
-
-      {paymentOpen && <div className="fixed inset-0 z-[80] bg-slate-950/45 p-0 backdrop-blur-sm sm:grid sm:place-items-center sm:p-4" onMouseDown={(e) => { if (e.currentTarget === e.target && !processing) setPaymentOpen(false); }}><div className="absolute inset-x-0 bottom-0 max-h-[94vh] overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:relative sm:max-w-lg sm:rounded-3xl sm:p-6"><div className="flex items-center justify-between"><div><p className="text-xs font-bold text-blue-700">Payment</p><h2 className="text-xl font-extrabold">Complete sale</h2></div><Button variant="ghost" size="icon" onClick={() => setPaymentOpen(false)} disabled={processing}><X /></Button></div><div className="mt-5 rounded-2xl bg-slate-950 p-5 text-white"><p className="text-xs text-slate-400">Amount due</p><p className="mt-1 text-3xl font-extrabold">{formatCurrency(total)}</p></div><div className="mt-5 grid grid-cols-2 gap-2"><button onClick={() => setPaymentMethod("cash")} className={cn("flex h-12 items-center justify-center gap-2 rounded-xl border font-bold", paymentMethod === "cash" ? "border-blue-600 bg-blue-50 text-blue-700" : "border-slate-200")}><ReceiptText /> Cash</button><button onClick={() => setPaymentMethod("card")} className={cn("flex h-12 items-center justify-center gap-2 rounded-xl border font-bold", paymentMethod === "card" ? "border-blue-600 bg-blue-50 text-blue-700" : "border-slate-200")}><CreditCard /> Card</button></div>{paymentMethod === "cash" && <label className="mt-4 block"><span className="mb-1.5 block text-sm font-semibold">Cash received</span><Input inputMode="decimal" value={tendered} onChange={(e) => setTendered(e.target.value)} autoFocus placeholder="0.00" /><span className="mt-2 block text-sm text-slate-500">Change: <strong className="text-slate-900">{formatCurrency(change)}</strong></span></label>}<Button onClick={checkout} disabled={processing || !cart.length || (paymentMethod === "cash" && (Number(tendered) || 0) < total)} size="lg" className="mt-6 w-full">{processing ? <><LoaderCircle className="animate-spin" /> Processing securely…</> : <>Complete payment · {formatCurrency(total)}</>}</Button><p className="mt-3 text-center text-xs leading-5 text-slate-500">Stock, sale and payment are committed together. Closing this screen does not create a sale.</p></div></div>}
-    </main>
-  );
+      if (!response.ok) {
+        if (response.status === 400 || response.status === 409) { setRequest(null); setSearchVersion((n) => n + 1); }
+        throw new Error(result.error ?? "The sale could not be confirmed. Retry to check its status.");
+      }
+      if (!result.sale_id || !result.invoice_number) throw new Error("The sale could not be confirmed. Retry to check its status.");
+      setSaleResult(result); setRequest(null); setPaymentOpen(false); setCartOpen(false);
+      try { sessionStorage.setItem(storageKey, JSON.stringify({ cart, request: null, saleResult: result, discount })); } catch {}
+      toast.success("Sale completed.");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "The sale could not be confirmed. Retry this sale before starting another."); }
+    finally { busyRef.current = false; setProcessing(false); }
+  }
+  function nextSale() { setCart([]); setRequest(null); setSaleResult(null); setDiscount("0"); setTendered(""); setMethod("cash"); setQuery(""); setSearchVersion((n) => n + 1); }
+  if (saleResult) return <main className="grid min-h-[70vh] place-items-center p-4"><Card className="w-full max-w-lg p-6 text-center"><CheckCircle2 className="mx-auto size-14 text-emerald-600" /><p className="mt-4 text-sm font-bold text-emerald-700">Sale completed</p><h1 className="mt-2 text-xl font-extrabold">{saleResult.invoice_number}</h1><p className="mt-4 text-3xl font-extrabold">{formatCurrency(saleResult.net_total)}</p>{Number(saleResult.change_amount) > 0 && <p className="mt-2">Change: {formatCurrency(saleResult.change_amount)}</p>}<div className="mt-6 grid gap-3"><Link className={buttonVariants({ size: "lg" })} href={"/sales/" + saleResult.sale_id + "?print=thermal"}><Printer /> Print receipt</Link><Button size="lg" variant="outline" onClick={nextSale}>Next sale</Button></div></Card></main>;
+  const panel = <CartPanel cart={cart} subtotal={subtotalMinor / 100} total={total} discount={discount} onDiscount={setDiscount} onQuantity={quantity} onCheckout={() => { setCartOpen(false); setPaymentOpen(true); }} locked={Boolean(request) || processing} />;
+  return <main data-role={role} className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-[1600px] flex-col gap-4 p-3 pb-40 sm:p-5 sm:pb-40 lg:h-[calc(100dvh-4.5rem)] lg:flex-row lg:overflow-hidden lg:p-6">
+    <section className="flex min-w-0 flex-1 flex-col lg:overflow-hidden"><div><p className="text-xs font-bold text-blue-700">Point of Sale</p><h1 className="text-2xl font-extrabold">New sale</h1></div>
+      <div className="relative mt-3"><Search className="absolute left-3 top-3.5 size-5 text-slate-400" /><Input ref={searchRef} autoFocus className="h-12 pl-11 text-base" aria-label="Medicine search" placeholder="Search or scan medicine" value={query} onChange={(e) => setQuery(e.target.value)} /></div><p className="mt-2 text-xs text-slate-500">Choose a selling unit, then add to cart. F4 focuses search.</p>
+      {request && <div role="alert" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Sale status is unconfirmed. Retry safely before changing the cart.<Button className="mt-2 w-full" onClick={() => setPaymentOpen(true)}>Retry Sale</Button></div>}
+      {searchError && <div role="alert" className="mt-3 text-sm text-red-700">{searchError}<Button variant="ghost" onClick={() => setSearchVersion((n) => n + 1)}>Try again</Button></div>}
+      <div aria-busy={loading} className="scrollbar-thin mt-4 grid flex-1 auto-rows-min grid-cols-1 gap-3 overflow-y-auto pb-4 sm:grid-cols-2 xl:grid-cols-3">
+        {loading && !medicines.length && <p role="status">Finding medicines...</p>}
+        {!loading && !searchError && !medicines.length && <p className="col-span-full rounded-xl bg-white p-6 text-sm text-slate-500">No medicines found. Try another name or barcode.</p>}
+        {medicines.map((m) => <MedicineCard key={m.id} medicine={m} preferred={preferredUnits[m.id]} inCart={cartBaseQuantity(cart, m.id)} locked={Boolean(request) || processing} onAdd={(u, q) => add(m, u, q)} />)}
+      </div>
+    </section>
+    <aside aria-label="Cart" className="hidden w-[360px] shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white lg:flex">{panel}</aside>
+    <div className="fixed inset-x-0 bottom-[61px] z-40 border-t border-slate-200 bg-white p-3 lg:hidden"><Button size="lg" className="w-full justify-between" onClick={() => setCartOpen(true)}><span className="flex items-center gap-2"><ShoppingCart />{cart.length ? "Cart & Checkout" : "View cart"}</span><strong>{formatCurrency(total)}</strong></Button></div>
+    {cartOpen && <Dialog label="Current sale" fallbackFocus={searchRef} fullScreen onClose={() => setCartOpen(false)}><div className="flex h-full flex-col"><div className="flex items-center justify-between border-b p-3"><h2 className="font-bold">Current sale</h2><Button variant="ghost" aria-label="Close cart" size="icon" onClick={() => setCartOpen(false)}><X /></Button></div>{panel}</div></Dialog>}
+    {paymentOpen && <Dialog label="Complete sale" fallbackFocus={searchRef} busy={processing} onClose={() => setPaymentOpen(false)}><div className="flex items-center justify-between"><h2 className="text-xl font-extrabold">{request ? "Confirm sale status" : "Complete sale"}</h2><Button variant="ghost" size="icon" aria-label="Close payment" disabled={processing} onClick={() => setPaymentOpen(false)}><X /></Button></div><div className="mt-5 rounded-xl bg-slate-950 p-5 text-white"><p className="text-sm text-slate-300">Amount due</p><p className="mt-1 text-3xl font-extrabold">{formatCurrency(request ? request.items.reduce((s, l) => s + toMinor(l.expectedPrice) * l.quantity, 0) / 100 - request.discount : total)}</p></div>{!request && <><fieldset className="mt-4 flex gap-2" disabled={processing}><legend className="mb-2 text-sm font-bold">Payment method</legend>{(["cash", "card"] as const).map((value) => <Button key={value} variant={method === value ? "default" : "outline"} className="h-12 flex-1 capitalize" aria-pressed={method === value} onClick={() => setMethod(value)}>{value}</Button>)}</fieldset>{method === "cash" && <label className="mt-4 block"><span className="mb-2 block text-sm font-bold">Cash received (Rs.)</span><Input autoFocus inputMode="decimal" value={tendered} disabled={processing} onChange={(e) => setTendered(e.target.value)} /><Button className="mt-2" variant="secondary" disabled={processing} onClick={() => setTendered(total.toFixed(2))}>Exact amount</Button><p className="mt-3 text-sm">Change: <strong>{formatCurrency(change)}</strong></p></label>}</>}<Button size="lg" className="mt-5 w-full" onClick={checkout} disabled={processing || !cart.length || (!request && method === "cash" && toMinor(tendered) < subtotalMinor - discountMinor)}>{processing ? <><LoaderCircle className="animate-spin" /> Completing sale...</> : request ? "Retry Sale" : "Complete Sale"}</Button></Dialog>}
+  </main>;
 }
 
-function CartPanel({ cart, subtotal, total, discount, onDiscount, onQuantity, onCheckout }: { cart: CartItem[]; subtotal: number; total: number; discount: string; onDiscount: (value: string) => void; onQuantity: (id: string, value: number) => void; onCheckout: () => void }) {
-  return <><div className="flex items-center justify-between border-b p-4"><div><h2 className="font-extrabold">Current sale</h2><p className="text-xs text-slate-500">{cart.length} medicine{cart.length === 1 ? "" : "s"}</p></div><ShoppingCart className="text-blue-600" /></div><div className="scrollbar-thin flex-1 space-y-2 overflow-y-auto p-3">{cart.length === 0 ? <div className="grid h-full min-h-48 place-items-center text-center"><div><ShoppingCart className="mx-auto size-10 text-slate-300" /><p className="mt-3 font-bold">Cart is empty</p><p className="mt-1 text-sm text-slate-500">Select a medicine to add it.</p></div></div> : cart.map((item) => <div key={item.id} className="rounded-xl border border-slate-100 p-3"><div className="flex justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-bold">{item.name} {item.strength}</p><p className="text-xs text-slate-500">{formatCurrency(item.selling_price)} / {item.base_unit}</p></div><button className="text-slate-400 hover:text-red-600" onClick={() => onQuantity(item.id, 0)} aria-label={`Remove ${item.name}`}><Trash2 className="size-4" /></button></div><div className="mt-3 flex items-center justify-between"><div className="flex items-center rounded-lg border"><button className="grid size-8 place-items-center" onClick={() => onQuantity(item.id, item.quantity - 1)}><Minus className="size-3.5" /></button><span className="w-9 text-center text-sm font-bold tabular-nums">{item.quantity}</span><button className="grid size-8 place-items-center" onClick={() => onQuantity(item.id, item.quantity + 1)}><Plus className="size-3.5" /></button></div><strong>{formatCurrency(item.selling_price * item.quantity)}</strong></div></div>)}</div><div className="border-t bg-slate-50 p-4"><label className="flex items-center justify-between gap-3 text-sm"><span className="font-semibold text-slate-600">Discount (Rs.)</span><Input className="h-9 w-28 text-right" inputMode="decimal" value={discount} onChange={(e) => onDiscount(e.target.value)} /></label><div className="mt-3 space-y-2 text-sm"><div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div><div className="flex justify-between text-lg font-extrabold"><span>Total</span><span>{formatCurrency(total)}</span></div></div><Button size="lg" className="mt-4 w-full" onClick={onCheckout} disabled={!cart.length}><CreditCard /> Checkout</Button></div></>;
+function MedicineCard({ medicine: m, preferred, inCart, locked, onAdd }: { medicine: StockMedicine; preferred?: string; inCart: number; locked: boolean; onAdd: (unit: SellingUnit, quantity: number) => void }) {
+  const [selected, setSelected] = useState(preferred ?? "base");
+  const [quantity, setQuantity] = useState(1);
+  const unit = m.units.find((u) => u.unit_key === selected && u.base_quantity <= m.available_quantity) ?? m.units.find((u) => u.base_quantity <= m.available_quantity) ?? m.units[0];
+  const available = m.available_quantity - inCart;
+  return <article aria-label={m.name + " " + (m.strength ?? "")} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="font-extrabold">{m.name} {m.strength}</h2><p className="mt-1 text-xs text-slate-500">{m.manufacturer || m.generic_name || m.dosage_form}</p><p className={cn("mt-2 text-sm font-semibold", m.stock_status === "in_stock" ? "text-emerald-700" : "text-amber-700")}>Available: {pluralUnit(m.base_unit, m.available_quantity)}</p>{m.is_active === false || m.packaging_status !== "confirmed" || !unit ? <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">Owner review needed before selling.</p> : <><div className="mt-3 flex flex-wrap gap-1" role="group" aria-label="Selling unit">{m.units.map((u) => <button key={u.unit_key} disabled={locked || u.base_quantity > available} aria-pressed={unit.unit_key === u.unit_key} onClick={() => { setSelected(u.unit_key); setQuantity(1); }} className={cn("min-h-11 flex-1 rounded-lg border px-2 text-sm font-bold capitalize disabled:opacity-40", unit.unit_key === u.unit_key ? "border-blue-600 bg-blue-50 text-blue-700" : "border-slate-200")}>{u.label}</button>)}</div><p className="mt-3 text-lg font-extrabold text-blue-700">{formatCurrency(unit.selling_price)} <span className="text-xs font-normal text-slate-500">/ {unit.label}</span></p>{unit.base_quantity > 1 && <p className="mt-1 text-xs text-slate-500">1 {unit.label} = {pluralUnit(m.base_unit, unit.base_quantity)}</p>}<div className="mt-3 flex items-center justify-between gap-2"><Quantity label={"Quantity of " + m.name + " " + unit.label} value={quantity} onChange={setQuantity} min={1} disabled={locked} /><strong className="text-sm">{formatCurrency(toMinor(unit.selling_price) * quantity / 100)}</strong></div><Button className="mt-3 h-12 w-full" disabled={locked || quantity * unit.base_quantity > available || !Number.isSafeInteger(quantity) || quantity < 1} onClick={() => onAdd(unit, quantity)}><Plus /> Add to Cart</Button></>}</article>;
+}
+function Quantity({ label, value, onChange, min = 0, disabled }: { label: string; value: number; onChange: (n: number) => void; min?: number; disabled?: boolean }) {
+  return <div className="flex items-center rounded-xl border border-slate-200"><button className="grid size-11 place-items-center disabled:opacity-40" disabled={disabled || value <= min} aria-label={"Decrease " + label} onClick={() => onChange(value - 1)}><Minus className="size-4" /></button><input aria-label={label} type="number" inputMode="numeric" step="1" min={min} className="h-11 w-12 text-center font-bold outline-none focus:ring-2 focus:ring-blue-500" disabled={disabled} value={value} onChange={(e) => { const n = Number(e.target.value); if (Number.isSafeInteger(n) && n >= min) onChange(n); }} /><button className="grid size-11 place-items-center" disabled={disabled} aria-label={"Increase " + label} onClick={() => onChange(value + 1)}><Plus className="size-4" /></button></div>;
+}
+function CartPanel({ cart, subtotal, total, discount, onDiscount, onQuantity, onCheckout, locked }: { cart: CartItem[]; subtotal: number; total: number; discount: string; onDiscount: (v: string) => void; onQuantity: (key: string, n: number) => void; onCheckout: () => void; locked: boolean }) {
+  return <><div className="border-b p-4"><h2 className="font-extrabold">Cart</h2><p className="text-xs text-slate-500">{cart.length} item lines</p></div><div className="flex-1 space-y-3 overflow-y-auto p-3">{!cart.length && <p className="py-12 text-center text-sm text-slate-500">Choose a medicine and tap Add to Cart.</p>}{cart.map((line) => <div key={line.lineKey} className="rounded-xl border border-slate-100 p-3"><div className="flex justify-between gap-2"><div><h3 className="text-sm font-bold">{line.name} {line.strength}</h3><p className="mt-1 text-xs text-slate-500">{formatCurrency(line.unit.selling_price)} / {line.unit.label}</p></div><button aria-label={"Remove " + line.name + " " + line.unit.label} disabled={locked} className="grid size-11 shrink-0 place-items-center text-slate-400" onClick={() => onQuantity(line.lineKey, 0)}><Trash2 className="size-4" /></button></div><div className="mt-2 flex items-center justify-between gap-2"><Quantity label={line.name + " " + line.unit.label + " in cart"} value={line.quantity} onChange={(n) => onQuantity(line.lineKey, n)} disabled={locked} /><strong>{formatCurrency(toMinor(line.unit.selling_price) * line.quantity / 100)}</strong></div></div>)}</div><div className="border-t bg-slate-50 p-4"><details><summary className="cursor-pointer text-sm font-semibold">Add a discount</summary><label className="mt-2 block text-sm">Discount (Rs.)<Input inputMode="decimal" value={discount} disabled={locked} onChange={(e) => onDiscount(e.target.value)} /></label></details><p className="mt-3 flex justify-between text-sm text-slate-500"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></p><p className="mt-2 flex justify-between text-xl font-extrabold"><span>Total</span><span>{formatCurrency(total)}</span></p><Button size="lg" className="mt-4 w-full" disabled={!cart.length} onClick={onCheckout}><CreditCard />{locked ? "Retry Sale" : "Checkout"}</Button></div></>;
 }

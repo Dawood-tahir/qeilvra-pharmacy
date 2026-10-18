@@ -1,0 +1,10 @@
+import MedicinesPage from "@/app/(app)/medicines/page";
+import { createRoot } from "react-dom/client";
+import { Toaster } from "sonner";
+import { MedicineForm } from "@/components/medicines/medicine-form";
+import { RestockForm } from "@/components/medicines/restock-form";
+import { PosWorkspace } from "@/components/pos/pos-workspace";
+import "@/app/globals.css";
+const flow=location.pathname==="/medicines"?"inventory":new URLSearchParams(location.search).get("flow");
+const inventory=flow==="inventory"?await MedicinesPage({searchParams:Promise.resolve(Object.fromEntries(new URLSearchParams(location.search))) }):null;
+createRoot(document.getElementById("root")!).render(<><div className="border-b bg-[#071b45] p-4 font-bold text-white">Qeilvra <span className="text-xs font-normal text-blue-200">workflow test fixture</span></div>{flow==="inventory"?inventory:flow==="pos"?<PosWorkspace role="salesperson" staffId="fixture"/>:<main className="mx-auto max-w-3xl p-4"><h1 className="mb-4 text-2xl font-extrabold">{flow==="restock"?"Add More Stock":"Add New Medicine"}</h1><div className="rounded-2xl border border-slate-200 bg-white p-4">{flow==="restock"?<RestockForm/>:<MedicineForm/>}</div></main>}<Toaster/></>);

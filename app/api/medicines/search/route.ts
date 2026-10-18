@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { data, error } = await supabase.rpc("search_sellable_medicines", { p_query: parsed.data.q, p_limit: parsed.data.limit });
+  const { data, error } = await supabase.rpc("inventory_search", { p_query: parsed.data.q, p_limit: parsed.data.limit });
   if (error) return NextResponse.json({ error: "Medicine search failed." }, { status: 400 });
   return NextResponse.json(data, { headers: { "Cache-Control": "private, no-store" } });
 }

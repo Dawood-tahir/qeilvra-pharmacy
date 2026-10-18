@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(17);
+select plan(18);
 
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
 values
@@ -14,9 +14,12 @@ insert into public.user_roles (user_id, role) values
   ('10000000-0000-0000-0000-000000000001', 'owner'),
   ('20000000-0000-0000-0000-000000000002', 'salesperson');
 insert into public.medicine_categories (id, name) values ('30000000-0000-0000-0000-000000000003', 'Test category');
-insert into public.medicines (id, name, category_id, sku, selling_price, reorder_level, base_unit, created_by) values
-  ('40000000-0000-0000-0000-000000000004', 'Valid Medicine', '30000000-0000-0000-0000-000000000003', 'VALID-1', 100, 2, 'tablet', '10000000-0000-0000-0000-000000000001'),
-  ('40000000-0000-0000-0000-000000000005', 'Expired Medicine', '30000000-0000-0000-0000-000000000003', 'EXPIRED-1', 50, 2, 'tablet', '10000000-0000-0000-0000-000000000001');
+insert into public.medicines (id, name, category_id, sku, selling_price, reorder_level, base_unit, packaging_status, created_by) values
+  ('40000000-0000-0000-0000-000000000004', 'Valid Medicine', '30000000-0000-0000-0000-000000000003', 'VALID-1', 100, 2, 'tablet', 'confirmed', '10000000-0000-0000-0000-000000000001'),
+  ('40000000-0000-0000-0000-000000000005', 'Expired Medicine', '30000000-0000-0000-0000-000000000003', 'EXPIRED-1', 50, 2, 'tablet', 'confirmed', '10000000-0000-0000-0000-000000000001');
+insert into public.medicine_units(medicine_id,unit_key,label,base_quantity,selling_price) values
+ ('40000000-0000-0000-0000-000000000004','base','tablet',1,100),
+ ('40000000-0000-0000-0000-000000000005','base','tablet',1,50);
 insert into public.medicine_costs (medicine_id, default_purchase_cost, updated_by) values
   ('40000000-0000-0000-0000-000000000004', 60, '10000000-0000-0000-0000-000000000001');
 insert into public.medicine_batches (id, medicine_id, batch_number, expiry_date, quantity_on_hand, purchase_cost) values
@@ -30,7 +33,7 @@ select is((select count(*) from public.medicine_costs), 0::bigint, 'salesperson 
 select is((select count(*) from public.medicine_batches), 0::bigint, 'salesperson cannot read cost-bearing batch rows');
 select is((select count(*) from public.medicines), 2::bigint, 'salesperson can read the sales-safe catalogue');
 
-update public.medicines set selling_price = 1 where id = '40000000-0000-0000-0000-000000000004';
+select throws_ok($$update public.medicines set selling_price=1 where id='40000000-0000-0000-0000-000000000004'$$,'42501',null,'direct master price writes denied');
 select is((select selling_price from public.medicines where id = '40000000-0000-0000-0000-000000000004'), 100.00::numeric, 'salesperson cannot change a selling price');
 update public.user_roles set role = 'owner' where user_id = '20000000-0000-0000-0000-000000000002';
 select is(public.current_role()::text, 'salesperson', 'salesperson cannot elevate their role');
