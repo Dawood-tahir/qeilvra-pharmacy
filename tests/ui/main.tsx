@@ -17,6 +17,7 @@ import ExpensesPage from "@/app/(app)/expenses/page";
 import SuppliersPage from "@/app/(app)/suppliers/page";
 import SupplierProfilePage from "@/app/(app)/suppliers/[id]/page";
 import RestockPage from "@/app/(app)/medicines/restock/page";
+import NewMedicinePage from "@/app/(app)/medicines/new/page";
 import ReportsPage from "@/app/(app)/reports/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import UsersPage from "@/app/(app)/users/page";
@@ -32,6 +33,7 @@ const flow = routeFlows[location.pathname] ?? (location.pathname.startsWith("/su
 const role = params.get("role") === "salesperson" ? "salesperson" as const : "owner" as const;
 let screen;
 switch (flow) {
+  case "new": screen = await NewMedicinePage(); break;
   case "inventory": screen = await MedicinesPage({ searchParams }); break;
   case "pos": screen = <PosWorkspace role={role} staffId="fixture" />; break;
   case "dashboard": screen = await DashboardPage({ searchParams }); break;

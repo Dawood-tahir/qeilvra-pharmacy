@@ -54,6 +54,19 @@ describe("existing Owner receiving operations", () => {
     expect(await createPurchaseAction(purchase)).toEqual({ ok: true, id });
     expect(rpc).toHaveBeenCalledExactlyOnceWith("create_purchase", expect.objectContaining({ p_data: expect.objectContaining({ supplier_id: supplierId }), p_items: purchase.items }));
   });
+  it("initial stock rejects supplier names before calling the database", async () => {
+    const data = { name: "Paracetamol", dosage_form: "Tablet", strength: "500mg", barcode: "", manufacturer: "", tablets_per_strip: 10, strips_per_box: 10, units: [{ unit_key: "base", selling_price: "7", max_price: null }] };
+    expect(await saveGuidedMedicineAction(null, data, { ...stock, supplier_id: "City Medical" }, key)).toMatchObject({ ok: false });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+  it("initial stock keeps supplier identity out of the permanent medicine fields", async () => {
+    const data = { name: "Paracetamol", dosage_form: "Tablet", strength: "500mg", barcode: "", manufacturer: "", tablets_per_strip: 10, strips_per_box: 10, supplier_id: supplierId, units: [{ unit_key: "base", selling_price: "7", max_price: null }] };
+    expect(await saveGuidedMedicineAction(null, data, stock, key)).toMatchObject({ ok: true });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    const args = rpc.mock.calls[0][1];
+    expect(args.p_stock.supplier_id).toBe(supplierId);
+    expect(args.p_data).not.toHaveProperty("supplier_id");
+  });
   it("an ambiguous draft result requires checking Purchases instead of creating another draft", async () => {
     rpc.mockResolvedValue({ data: null, error: { code: "", message: "Network error" } });
     expect(await createPurchaseAction(purchase)).toMatchObject({ ok: false, uncertain: true });

@@ -11,6 +11,7 @@ class FixtureQuery {
   constructor(table: string) {
     const profile = location.pathname.startsWith("/suppliers/") || (location.pathname.startsWith("/purchases/") && ![purchase.id, "new"].includes(location.pathname.split("/").at(-1)!));
     this.rows = [...((profile ? supplierFixtureTables() : tables)[table] ?? [])];
+    if (table === "suppliers" && new URLSearchParams(location.search).get("suppliers") === "none") this.rows = [];
   }
   value(row: Record<string, unknown>, key: string): unknown { return key.replace(/\((\w+)\)/, ".$1").split(".").reduce<unknown>((value, part) => (value as Record<string, unknown> | undefined)?.[part], row); }
   select() { return this; }
