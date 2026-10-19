@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DispositionHistory } from "@/components/stock/disposition-history";
 import { ArrowLeft, Bell, Building2, CalendarDays, Mail, MapPin, Package, Phone, ReceiptText, Truck } from "lucide-react";
 import { setSupplierActiveAction } from "@/app/(app)/suppliers/actions";
 import { ActionForm } from "@/components/ui/action-form";
@@ -83,5 +84,6 @@ export function SupplierProfile({ profile, options }: { profile: Profile; option
       {(options.tab === "overview" || options.tab === "medicines") && section("Medicines Received", options.tab === "overview" ? "Latest deliveries. View all for quantities, batches, expiry dates and costs." : "Every received invoice line is kept separately, including repeated deliveries of the same medicine or batch. Line totals are before any invoice discount.", <Deliveries items={profile.deliveries.rows} compact={options.tab === "overview"} />, options.tab === "overview" ? "medicines" : undefined)}
     </div>}
     {options.tab !== "overview" && <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><p role="status" className="text-slate-500">{count} result{count === 1 ? "" : "s"} · Page {options.page} of {totalPages}</p><nav aria-label="Supplier results pages" className="flex gap-2">{options.page > 1 && <Link className={buttonVariants({ variant: "outline", size: "sm" })} href={href(options.tab, options.page - 1, options.query, options.status)}>Previous</Link>}{options.page < totalPages && <Link className={buttonVariants({ variant: "outline", size: "sm" })} href={href(options.tab, options.page + 1, options.query, options.status)}>Next</Link>}</nav></div>}
+    <DispositionHistory history={profile.stockHistory} />
   </main>;
 }

@@ -1,3 +1,4 @@
+import { loadDispositionHistory } from "@/lib/stock-disposition-data";
 import { requireOwner } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { localDateISO } from "@/lib/utils";
@@ -53,7 +54,7 @@ export async function loadSupplierProfile(id: string, options: ProfileOptions) {
   const summary = summarizeSupplier(id, summaryRows);
   const limit = options.tab === "overview" ? 3 : PAGE_SIZE;
   const offset = options.tab === "overview" ? 0 : (options.page - 1) * limit;
-  const [alerts, invoices, deliveries] = await Promise.all([
+  const [alerts, invoices, deliveries, stockHistory] = await Promise.all([
     ["overview", "alerts"].includes(options.tab) ? loadAlerts(client, summary.lastPurchases) : Promise.resolve([]),
     (async () => {
       if (!["overview", "history"].includes(options.tab)) return { rows: [] as SupplierInvoice[], count: 0 };
@@ -75,6 +76,7 @@ export async function loadSupplierProfile(id: string, options: ProfileOptions) {
       if (error) throw new Error("Medicines received could not be loaded. Please try again.");
       return { rows: (data ?? []) as unknown as SupplierDelivery[], count: count ?? 0 };
     })(),
+    loadDispositionHistory({ supplierId: id }),
   ]);
-  return { supplier: data as Supplier, summary, alerts, invoices, deliveries, pageSize: PAGE_SIZE };
+  return { supplier: data as Supplier, summary, alerts, invoices, deliveries, stockHistory, pageSize: PAGE_SIZE };
 }

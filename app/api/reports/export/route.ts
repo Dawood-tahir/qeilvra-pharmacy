@@ -29,8 +29,8 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.rpc("owner_financial_analytics", { p_from: from, p_to: to, p_granularity: "day" });
     if (error || !data?.metrics) return NextResponse.json({ error: "Financial export could not load. Please retry." }, { status: 503 });
     const snapshot = data as FinancialSnapshot;
-    const fields = ["sales_count", "gross_sales", "discounts", "refunds", "medicine_revenue", "extra_charge_revenue", "revenue", "cogs", "gross_profit", "expenses", "net_operating_profit"] as const;
-    const headings = ["Date (Asia/Karachi)", "Total Sales", "Gross Sales", "Discounts Given", "Sales Refunds", "Net Medicine Revenue", "Extra Charges", "Total Revenue", "Cost of Goods Sold", "Gross Profit", "Operating Expenses", "Net Operating Profit"];
+    const fields = ["sales_count", "gross_sales", "discounts", "refunds", "medicine_revenue", "extra_charge_revenue", "revenue", "cogs", "gross_profit", "expenses", "net_operating_profit", "stock_written_off", "supplier_returns_value", "supplier_recoveries", "supplier_replacements_value", "net_inventory_loss"] as const;
+    const headings = ["Date (Asia/Karachi)", "Total Sales", "Gross Sales", "Discounts Given", "Sales Refunds", "Net Medicine Revenue", "Extra Charges", "Total Revenue", "Cost of Goods Sold", "Gross Profit", "Operating Expenses", "Net Operating Profit", "Expired/Damaged Stock Written Off", "Stock Value Returned to Suppliers", "Confirmed Supplier Refunds/Credits", "Replacement Stock Received", "Net Inventory Loss"];
     const csv = "\uFEFF" + csvRow(headings) + snapshot.daily.map(day => csvRow([day.sale_date, ...fields.map(field => day[field])])).join("") + csvRow(["TOTAL", ...fields.map(field => snapshot.metrics[field])]);
     return new NextResponse(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="qeilvra-financials-${from}-to-${to}.csv"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
   }

@@ -21,6 +21,14 @@ describe("complete Owner CSV exports", () => {
     expect(rpc).toHaveBeenCalledWith("owner_financial_analytics", { p_from: "2026-10-01", p_to: "2026-10-19", p_granularity: "day" });
   });
   it("rejects reversed dates before querying the database", async () => { expect((await GET(request("type=sales&from=2026-10-19&to=2026-10-01"))).status).toBe(400); expect(from).not.toHaveBeenCalled(); });
+  it("exports stock losses and confirmed supplier recoveries separately from customer revenue", async () => {
+    const metrics = { sales_count: 1, gross_sales: 500, discounts: 50, refunds: 0, medicine_revenue: 450, extra_charge_revenue: 30, revenue: 480, cogs: 300, gross_profit: 180, expenses: 50, net_operating_profit: 106, stock_written_off: 14, supplier_returns_value: 30, supplier_recoveries: 12, supplier_replacements_value: 8, net_inventory_loss: 24 };
+    rpc.mockImplementation(async name => name === "current_role" ? { data: "owner" } : { data: { metrics, daily: [{ ...metrics, sale_date: "2026-10-19" }] } });
+    const csv = await (await GET(request("type=financials&from=2026-10-01&to=2026-10-19"))).text();
+    expect(csv).toContain('"Confirmed Supplier Refunds/Credits","Replacement Stock Received","Net Inventory Loss"');
+    expect(csv).toContain('"TOTAL","1","500","50","0","450","30","480","300","180","50","106","14","30","12","8","24"');
+    expect(csv).toContain('"2026-10-19","1","500","50","0","450","30","480","300","180","50","106","14","30","12","8","24"');
+  });
   it("requires authentication", async () => { getUser.mockResolvedValue({ data: { user: null } }); expect((await GET(request())).status).toBe(401); expect(from).not.toHaveBeenCalled(); });
   it("does not expose purchase costs to Salespeople", async () => { rpc.mockResolvedValue({ data: "salesperson" }); expect((await GET(request("type=inventory&from=2026-10-01&to=2026-10-19"))).status).toBe(403); expect(from).not.toHaveBeenCalled(); });
   it("reports query failures instead of downloading an empty financial report", async () => { range.mockResolvedValue({ data: null, count: null, error: { message: "private SQL details" } }); const response = await GET(request()); expect(response.status).toBe(503); expect(await response.text()).not.toContain("private SQL"); });

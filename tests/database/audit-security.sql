@@ -1,5 +1,5 @@
 -- Run only in the disposable local database, after business contract fixtures.
-create function public.test_forbidden(statement text,label text) returns void language plpgsql as $$
+create or replace function public.test_forbidden(statement text,label text) returns void language plpgsql as $$
 begin
  begin execute statement; exception when insufficient_privilege then raise notice 'PASS: %',label; return; end;
  raise exception 'FAIL: % did not raise insufficient_privilege',label;

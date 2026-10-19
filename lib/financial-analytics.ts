@@ -19,7 +19,7 @@ export function financeRange(period: string = "today", from?: string, to?: strin
 
 export type FinancialMetrics = {
   sales_count: number; gross_sales: number; discounts: number; refunds: number; medicine_revenue: number;
-  extra_charge_revenue: number; revenue: number; cogs: number; gross_profit: number; expenses: number; net_operating_profit: number;
+  extra_charge_revenue: number; revenue: number; cogs: number; gross_profit: number; expenses: number; net_operating_profit: number; stock_written_off: number; supplier_returns_value: number; supplier_recoveries: number; supplier_replacements_value: number; net_inventory_loss: number;
 };
 export type FinancialPoint = FinancialMetrics & { bucket_start: string; sale_date: string };
 export type FinancialTrendPoint = Pick<FinancialPoint, "bucket_start" | "sale_date" | "revenue" | "gross_profit">;

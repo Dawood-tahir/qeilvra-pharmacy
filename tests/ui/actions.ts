@@ -15,3 +15,6 @@ export async function setSalespersonActiveAction(data: FormData) { return submit
 export async function saveSettingsAction(data: FormData) { return submit("/__test/settings", Object.fromEntries(data)); }
 export async function createMedicineCategoryAction(data: FormData) { return submit("/__test/medicine-category", Object.fromEntries(data)); }
 export async function correctStockAction(data: unknown) { return submit("/__test/correct-stock", data); }
+
+export async function disposeStockAction(data: unknown) { return submit("/__test/dispose-stock", data); }
+export async function confirmSupplierRecoveryAction(data: unknown) { return submit("/__test/supplier-recovery", data); }

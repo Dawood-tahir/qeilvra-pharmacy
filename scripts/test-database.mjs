@@ -63,6 +63,9 @@ try {
     file(db, "tests/database/pos-workflow.sql");
     file(db, "supabase/migrations/202610190013_financial_analytics.sql");
     file(db, "tests/database/financial-analytics.sql");
+    file(db, "supabase/migrations/202610190014_stock_dispositions.sql");
+    file(db, "tests/database/stock-dispositions.sql");
+    file(db, "tests/database/audit-security.sql");
     const sale = "set role authenticated; select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',false); begin; select * from public.checkout_sale(jsonb_build_array(jsonb_build_object('medicine_id',(select id from public.test_ids where label='syrup'),'unit_key','base','quantity',1)),'cash',150,0,gen_random_uuid()); select pg_sleep(0.4); commit;";
     const results = await Promise.all([parallelSql(db, sale), parallelSql(db, sale)]);
     assert.equal(results.filter((r) => r.code === 0).length, 1, JSON.stringify(results));
@@ -86,6 +89,30 @@ try {
       assert.equal(sql(db, "select count(*) from public.payments where sale_id='" + refundSale + "' and kind='refund'").trim(), "1");
       assert.equal(sql(db, "select sum(refund_amount) from public.sale_returns where sale_id='" + refundSale + "' and status='approved'").trim(), "14.00");
       console.log("PASS: simultaneous " + (sameKey ? "same-key refund retries return one refund" : "distinct-key returns cannot over-refund"));
+    }
+    const owner = "set role authenticated; select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',false);";
+    const batch = sql(db, "select id from public.medicine_batches where medicine_id='" + medicine + "' order by quantity_on_hand desc limit 1").trim();
+    for (const sameKey of [true, false]) {
+      const balance = Number(sql(db, "select quantity_on_hand from public.medicine_batches where id='" + batch + "'").trim());
+      const keys = sameKey ? ["d9999999-0000-4000-8000-000000000001", "d9999999-0000-4000-8000-000000000001"] : ["d9999999-0000-4000-8000-000000000002", "d9999999-0000-4000-8000-000000000003"];
+      const removed = await Promise.all(keys.map(key => parallelSql(db, owner + "select public.dispose_stock('" + key + "','" + batch + "','discard',1," + balance + ",'Concurrent local disposal');")));
+      assert.equal(removed.filter(result => result.code === 0).length, sameKey ? 2 : 1, JSON.stringify(removed));
+      assert.equal(Number(sql(db, "select quantity_on_hand from public.medicine_batches where id='" + batch + "'").trim()), balance - 1);
+      assert.equal(sql(db, "select count(*) from public.stock_movements where reference_type='stock_disposition' and reference_id in ('" + keys.join("','") + "')").trim(), "1");
+      console.log("PASS: concurrent " + (sameKey ? "disposal retries deduct once" : "different disposal keys cannot reuse a stale balance"));
+    }
+    const supplier = sql(db, owner + "insert into public.suppliers(name,created_by) values('Concurrent local supplier',auth.uid()) returning id;").trim().split(/\r?\n/).at(-1);
+    // Remove once, then race both retry and distinct settlement keys against the same claim.
+    for (const sameKey of [true, false]) {
+      const balance = Number(sql(db, "select quantity_on_hand from public.medicine_batches where id='" + batch + "'").trim());
+      const originalSupplier = sql(db, "select coalesce(b.supplier_id,p.supplier_id,'" + supplier + "'::uuid) from public.medicine_batches b left join public.purchase_items pi on pi.id=b.purchase_item_id left join public.purchases p on p.id=pi.purchase_id where b.id='" + batch + "'").trim();
+      const claim = sql(db, owner + "select public.dispose_stock(gen_random_uuid(),'" + batch + "','supplier_return',1," + balance + ",'Concurrent supplier return','" + originalSupplier + "')->>'id';").trim().split(/\r?\n/).at(-1);
+      const keys = sameKey ? ["e9999999-0000-4000-8000-000000000001", "e9999999-0000-4000-8000-000000000001"] : ["e9999999-0000-4000-8000-000000000002", "e9999999-0000-4000-8000-000000000003"];
+      const settled = await Promise.all(keys.map(key => parallelSql(db, owner + "select public.confirm_supplier_recovery('" + key + "','" + claim + "','refund',1,'Local supplier receipt');")));
+      assert.equal(settled.filter(result => result.code === 0).length, sameKey ? 2 : 1, JSON.stringify(settled));
+      assert.equal(sql(db, "select count(*) from public.audit_logs where entity_type='stock_dispositions' and entity_id='" + claim + "' and action='confirm_supplier_recovery'").trim(), "1");
+      assert.equal(Number(sql(db, "select quantity_on_hand from public.medicine_batches where id='" + batch + "'").trim()), balance - 1);
+      console.log("PASS: concurrent " + (sameKey ? "settlement retries confirm once" : "different settlement keys cannot duplicate recoveries"));
     }
   }
   console.log("All local PostgreSQL migration, stock, financial and permission contracts passed.");
