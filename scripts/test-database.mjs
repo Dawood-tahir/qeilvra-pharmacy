@@ -40,6 +40,9 @@ try {
     run("createdb", [...base, db]); databases.push(db);
     file(db, "tests/database/bootstrap.sql");
     for (const migration of migrations) {
+      // Exercise historical pricing/return contracts before the replacement, then
+      // verify the final workflow and concurrent writes on the upgraded database.
+      if (!legacy && migration.startsWith("202610190012")) continue;
       if (legacy && migration.startsWith("202610180005")) file(db, "tests/database/legacy-before.sql");
       if (!legacy && migration.startsWith("202610190011")) {
         const original = sql(db, "select pg_get_functiondef('private.inventory_search(text,integer,integer,text,text)'::regprocedure)");
@@ -56,6 +59,8 @@ try {
     file(db, "tests/database/instant-returns.sql");
     file(db, "tests/database/audit-security.sql");
     file(db, "tests/database/inventory-equivalence.sql");
+    file(db, "supabase/migrations/202610190012_pos_workflow.sql");
+    file(db, "tests/database/pos-workflow.sql");
     const sale = "set role authenticated; select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',false); begin; select * from public.checkout_sale(jsonb_build_array(jsonb_build_object('medicine_id',(select id from public.test_ids where label='syrup'),'unit_key','base','quantity',1)),'cash',150,0,gen_random_uuid()); select pg_sleep(0.4); commit;";
     const results = await Promise.all([parallelSql(db, sale), parallelSql(db, sale)]);
     assert.equal(results.filter((r) => r.code === 0).length, 1, JSON.stringify(results));

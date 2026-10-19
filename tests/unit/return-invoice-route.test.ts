@@ -25,6 +25,12 @@ describe("POS invoice lookup", () => {
     rpc.mockResolvedValue({ data: null, error: { message: "offline" } });
     expect((await GET(request("QEI-123"))).status).toBe(503);
   });
+  it("identifies an unapplied return RPC without treating it as empty sales", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "PGRST202", message: "private SQL details" } });
+    const response = await GET(request(""));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "Returns are unavailable because the database update has not been applied. Contact the Owner." });
+  });
   it("validates dates and passes pagination to the scoped lookup", async () => {
     expect((await GET(new Request("http://localhost/api/returns/invoice?date=invalid"))).status).toBe(400);
     expect((await GET(new Request("http://localhost/api/returns/invoice?page=-1"))).status).toBe(400);

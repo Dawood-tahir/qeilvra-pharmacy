@@ -10,43 +10,54 @@ async function cart(page: Page) {
   if (page.viewportSize()!.width < 1024) await page.getByRole("button", { name: /Cart & Checkout|View cart/ }).click();
   return page.viewportSize()!.width < 1024 ? page.getByRole("dialog", { name: "Current sale" }) : page.getByRole("complementary", { name: "Cart" });
 }
-async function price(page: Page, value: string) {
-  const dialog = page.getByRole("dialog", { name: "Edit Price" });
-  await dialog.getByLabel("New price").fill(value);
-  await dialog.getByRole("button", { name: "Update Price" }).click();
-}
 async function noOverflow(page: Page) { expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); }
 
-test("custom card and cart prices preserve original snapshots and update all unit totals", async ({ page }) => {
+test("Inventory prices, inline discounts and extra charges reconcile at cash checkout", async ({ page }) => {
   await setup(page);
   const card = page.getByRole("article", { name: "Paracetamol 500mg" });
-  for (const [unit, value] of [["tablet", "6.50"], ["strip", "60"], ["box", "600"]]) {
-    await card.getByRole("button", { name: unit, exact: true }).click();
-    await card.getByRole("button", { name: "Change Price" }).click(); await price(page, value);
-    await card.getByRole("button", { name: "Add to Cart" }).click();
-  }
-  await page.reload();
-  const panel = await cart(page);
-  await expect(panel).toContainText("666.5");
-  await panel.getByRole("button", { name: "Change Price", exact: true }).first().click(); await price(page, "6");
-  await panel.getByRole("spinbutton", { name: "Paracetamol tablet in cart", exact: true }).fill("2");
-  await expect(panel).toContainText("672");
+  await expect(page.getByRole("button", { name: "Change Price" })).toHaveCount(0);
+  await card.getByRole("button", { name: "strip", exact: true }).click();
+  await card.getByRole("spinbutton").fill("3");
+  await card.getByRole("button", { name: "Add to Cart" }).click();
+  let panel = await cart(page);
+  await panel.getByText("Individual medicine discounts", { exact: true }).click();
+  await panel.getByLabel("Paracetamol strip discount (Rs.)", { exact: true }).fill("15");
+  await panel.getByRole("group", { name: "Bill discount type", exact: true }).getByRole("button", { name: "Percentage (%)" }).click();
+  await panel.getByLabel("Bill discount (%)", { exact: true }).fill("10");
+  await panel.getByText("+ Extra Charges", { exact: true }).click();
+  await panel.getByLabel("Description (optional)").fill("Delivery");
+  await panel.getByLabel("Extra Amount (Rs.)").fill("30");
+  await expect(panel).toContainText("192");
+  await page.reload(); panel = await cart(page);
+  await expect(panel.getByLabel("Bill discount (%)", { exact: true })).toHaveValue("10");
+  await expect(panel.getByLabel("Extra Amount (Rs.)")).toHaveValue("30");
   let payload: Record<string, unknown> | undefined;
-  await page.route("**/api/checkout", async (route) => { payload = route.request().postDataJSON(); await route.fulfill({ status: 201, json: { sale_id: sale.id, invoice_number: "QEI-CUSTOM", net_total: 672, change_amount: 28 } }); });
+  await page.route("**/api/checkout", async route => { payload = route.request().postDataJSON(); await route.fulfill({status:201,json:{sale_id:sale.id,invoice_number:"QEI-DISCOUNT",net_total:192,change_amount:8}}); });
   await panel.getByRole("button", { name: "Checkout", exact: true }).click();
   const payment = page.getByRole("dialog", { name: "Complete sale" });
-  await payment.getByLabel("Cash received").fill("700");
-  await expect(payment).toContainText("28"); await noOverflow(page);
+  await expect(payment).toContainText("Delivery");
+  await payment.getByLabel("Cash received").fill("200");
+  await expect(payment).toContainText("8");
+  await noOverflow(page);
   await payment.getByRole("button", { name: "Complete Sale", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "QEI-CUSTOM" })).toBeVisible();
-  expect(payload?.items).toEqual([
-    { medicineId: medicine.id, unitKey: "base", quantity: 2, expectedPrice: "7.00", customPrice: "6.00" },
-    { medicineId: medicine.id, unitKey: "strip", quantity: 1, expectedPrice: "65.00", customPrice: "60.00" },
-    { medicineId: medicine.id, unitKey: "box", quantity: 1, expectedPrice: "620.00", customPrice: "600.00" },
-  ]);
-  expect(await page.evaluate(() => sessionStorage.getItem("test-print-count"))).toBeNull();
-  await page.getByRole("button", { name: "Next sale" }).click();
-  await expect(card).toContainText("620"); // Preferred box is retained; its catalogue price is restored.
+  await expect(page.getByRole("heading", { name: "QEI-DISCOUNT" })).toBeVisible();
+  expect(payload).toMatchObject({items:[{medicineId:medicine.id,unitKey:"strip",quantity:3,expectedPrice:"65.00",lineDiscount:15}],discount:18,extraAmount:30,extraDescription:"Delivery"});
+  expect((payload?.items as Record<string,unknown>[])[0]).not.toHaveProperty("customPrice");
+});
+
+test("fixed discounts and extra charges can be edited and removed", async ({ page }) => {
+ await setup(page); await page.getByRole("button",{name:"Add to Cart"}).click();
+ const panel=await cart(page);
+ await panel.getByLabel("Bill discount (Rs.)",{exact:true}).fill("2");
+ await expect(panel).toContainText("5");
+ await panel.getByRole("button",{name:"Remove bill discount",exact:true}).click();
+ await expect(panel.getByLabel("Bill discount (Rs.)",{exact:true})).toHaveValue("0");
+ await panel.getByText("+ Extra Charges",{exact:true}).click();
+ await panel.getByLabel("Extra Amount (Rs.)").fill("3");
+ await expect(panel).toContainText("10");
+ await panel.getByRole("button",{name:"Remove extra charge",exact:true}).click();
+ await expect(panel.getByLabel("Extra Amount (Rs.)")).toHaveValue("0");
+ await noOverflow(page);
 });
 
 test("card requires external confirmation and auto print runs once after a successful retry", async ({ page }) => {
@@ -126,15 +137,15 @@ for (const role of ["owner", "salesperson"]) test(role + " completes a POS refun
   await expect(dialog.getByRole("button", { name: "Review", exact: true })).toHaveCount(0);
 });
 
-test("server discount rejection unlocks the cart for a corrected price", async ({ page }) => {
+test("server discount rejection unlocks the cart for a corrected discount", async ({ page }) => {
   await setup(page, "salesperson"); await page.getByRole("button", { name: "Add to Cart" }).click();
-  const panel = await cart(page); await panel.getByRole("button", { name: "Change Price" }).click(); await price(page, "1");
+  const panel = await cart(page); await panel.getByLabel("Bill discount (Rs.)", { exact: true }).fill("1");
   await page.route("**/api/checkout", (route) => route.fulfill({ status: 403, json: { error: "Discount exceeds the salesperson limit." } }));
   await panel.getByRole("button", { name: "Checkout", exact: true }).click();
   await page.getByRole("button", { name: "Exact amount" }).click(); await page.getByRole("button", { name: "Complete Sale", exact: true }).click();
   await expect(page.getByText("Discount exceeds the salesperson limit.")).toBeVisible();
   await page.getByRole("button", { name: "Close payment" }).click();
-  const corrected = await cart(page); await expect(corrected.getByRole("button", { name: "Change Price" })).toBeEnabled();
+  const corrected = await cart(page); await expect(corrected.getByLabel("Bill discount (Rs.)", { exact: true })).toBeEnabled();
 });
 
 test("an interrupted checkout keeps its retry key through a later session denial", async ({ page }) => {

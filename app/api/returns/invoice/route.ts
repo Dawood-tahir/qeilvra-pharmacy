@@ -12,6 +12,10 @@ export async function GET(request: Request) {
   if (authError || !user) return NextResponse.json({ error: "Sign in again to view recent sales." }, { status: 401 });
   // Includes all earlier returns without changing the existing authorized sale scope.
   const { data, error } = await supabase.rpc("return_sales", { p_query: parsed.data.q, p_date: parsed.data.date || null, p_offset: (parsed.data.page - 1) * 10, p_limit: 11, p_sale_id: parsed.data.sale || null });
-  if (error) return NextResponse.json({ error: "Could not load sales. Try again." }, { status: error.code === "42501" ? 403 : 503 });
+  if (error) {
+    // Log only the database error code; never log patient, invoice or authentication data.
+    console.error("Return sales lookup failed", { code: error.code });
+    return NextResponse.json({ error: error.code === "PGRST202" ? "Returns are unavailable because the database update has not been applied. Contact the Owner." : error.code === "42501" ? "Your account cannot access these sales. Sign in again or contact the Owner." : "Could not load sales. Try again." }, { status: error.code === "42501" ? 403 : 503, headers: { "Cache-Control": "private, no-store" } });
+  }
   return NextResponse.json({ sales: (data ?? []).slice(0, 10), hasMore: (data ?? []).length > 10 }, { headers: { "Cache-Control": "private, no-store" } });
 }

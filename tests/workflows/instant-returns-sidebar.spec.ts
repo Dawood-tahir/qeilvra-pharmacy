@@ -11,6 +11,34 @@ async function openReturns(page: Page, role = "owner") {
 }
 const noOverflow = async (page: Page) => expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
+test("failed loading shows Retry without a successful page indicator", async ({ page }) => {
+  let calls = 0;
+  await page.route("**/api/returns/invoice?**", route => ++calls === 1 ? route.fulfill({ status: 503, json: { error: "Could not load sales. Try again." } }) : route.fulfill({ json: { sales: [returnSale], hasMore: false } }));
+  const dialog = await openReturns(page);
+  await expect(dialog.getByRole("alert")).toContainText("Could not load sales");
+  await expect(dialog.getByText("Page 1", { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText("Loading recent sales...")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: /QEI-TEST-0001/ })).toBeVisible();
+  await noOverflow(page);
+});
+
+test("single tablets from an original strip use the original discounted pack price", async ({ page }) => {
+  let request: Record<string, unknown> | undefined;
+  await page.route("**/api/returns/invoice?**", route => route.fulfill({ json: { sales: [returnSale], hasMore: false } }));
+  await page.route("**/__test/complete-return", route => { request = route.request().postDataJSON(); return route.fulfill({ json: { ok: true, id: "return-tablet", returnNumber: "RET-TABLET", refund: 6 } }); });
+  const dialog = await openReturns(page, "salesperson");
+  await dialog.getByRole("button", { name: /QEI-TEST-0001/ }).click();
+  await dialog.getByLabel("Return unit for Paracetamol strip").selectOption("base");
+  await dialog.getByLabel("Return quantity for Paracetamol strip").fill("1");
+  await dialog.getByLabel("Reason for return").fill("One unopened tablet");
+  await expect(dialog.getByText("Refund amount").locator("..")).toContainText("6");
+  await dialog.getByRole("button", { name: "Complete Return", exact: true }).click();
+  await expect(dialog.getByRole("heading", { name: "Return completed" })).toBeVisible();
+  expect(request).toMatchObject({ items: [{ quantity: 1, in_base_units: true, restockable: false }] });
+  await noOverflow(page);
+});
+
 test("recent sales load automatically and search accepts medicine names, dates and pagination", async ({ page }) => {
   const lookups: URL[] = [];
   await page.route("**/api/returns/invoice?**", route => {
