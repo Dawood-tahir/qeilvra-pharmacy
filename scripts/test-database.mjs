@@ -49,6 +49,7 @@ try {
     file(db, "tests/database/supplier-receiving.sql");
     file(db, "tests/database/supplier-profiles.sql");
     file(db, "tests/database/pos-custom-prices.sql");
+    file(db, "tests/database/instant-returns.sql");
     const sale = "set role authenticated; select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',false); begin; select * from public.checkout_sale(jsonb_build_array(jsonb_build_object('medicine_id',(select id from public.test_ids where label='syrup'),'unit_key','base','quantity',1)),'cash',150,0,gen_random_uuid()); select pg_sleep(0.4); commit;";
     const results = await Promise.all([parallelSql(db, sale), parallelSql(db, sale)]);
     assert.equal(results.filter((r) => r.code === 0).length, 1, JSON.stringify(results));
@@ -62,6 +63,17 @@ try {
     assert.ok(retries.every((r) => r.code === 0),JSON.stringify(retries));
     assert.equal(sql(db,"select count(*) from sales where idempotency_key='" + request + "'").trim(),"1");
     console.log("PASS: simultaneous identical retries create one invoice");
+    for (const sameKey of [true, false]) {
+      const refundSale = sql(db, "set role authenticated; select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',false); select sale_id from public.checkout_sale(jsonb_build_array(jsonb_build_object('medicine_id','" + medicine + "'::uuid,'unit_key','base','quantity',2)),'cash',14,0,gen_random_uuid());").trim().split(/\r?\n/).at(-1);
+      const refundLine = sql(db, "select id from public.sale_items where sale_id='" + refundSale + "'").trim();
+      const returnKey = sameKey ? "a9999999-0000-4000-8000-000000000001" : null;
+      const refundRequest = (key) => "set role authenticated; select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',false); select public.complete_sale_return('" + refundSale + "',jsonb_build_array(jsonb_build_object('sale_item_id','" + refundLine + "'::uuid,'quantity',2,'restockable',true)),'Concurrent returned tablets','" + key + "');";
+      const completed = await Promise.all([parallelSql(db, refundRequest(returnKey ?? "a9999999-0000-4000-8000-000000000002")), parallelSql(db, refundRequest(returnKey ?? "a9999999-0000-4000-8000-000000000003"))]);
+      assert.equal(completed.filter((result) => result.code === 0).length, sameKey ? 2 : 1, JSON.stringify(completed));
+      assert.equal(sql(db, "select count(*) from public.payments where sale_id='" + refundSale + "' and kind='refund'").trim(), "1");
+      assert.equal(sql(db, "select sum(refund_amount) from public.sale_returns where sale_id='" + refundSale + "' and status='approved'").trim(), "14.00");
+      console.log("PASS: simultaneous " + (sameKey ? "same-key refund retries return one refund" : "distinct-key returns cannot over-refund"));
+    }
   }
   console.log("All local PostgreSQL migration, stock, financial and permission contracts passed.");
 } finally {

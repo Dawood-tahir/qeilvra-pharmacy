@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { medicine, sale, saleItem } from "../ui/data";
+import { medicine, sale, saleItem, returnSale } from "../ui/data";
 
 async function setup(page: Page, role = "owner") {
   await page.route("**/api/medicines/search?**", (route) => route.fulfill({ json: [medicine] }));
@@ -107,28 +107,23 @@ test("Auto Print OFF offers manual receipt printing at 80mm", async ({ page }) =
   expect(await page.evaluate(() => sessionStorage.getItem("test-print-count"))).toBe("2");
 });
 
-for (const role of ["owner", "salesperson"]) test(role + " requests a POS refund at original discounted prices", async ({ page }) => {
+for (const role of ["owner", "salesperson"]) test(role + " completes a POS refund immediately at original discounted prices", async ({ page }) => {
   await setup(page, role);
-  let requested = false, approved = false; const calls: unknown[] = [];
-  await page.route("**/api/returns/invoice?**", (route) => route.fulfill({ json: [{ ...sale, net_total: 180, sale_items: [{ ...saleItem, net_line_total: 180 }], sale_returns: requested ? [{ id: "return-new", status: approved ? "approved" : "requested", return_items: [{ id: "line-new", sale_item_id: saleItem.id, quantity: 2, approved_quantity: approved ? 2 : null }] }] : [] }] }));
-  await page.route("**/__test/return", async (route) => { calls.push(route.request().postDataJSON()); requested = true; await route.fulfill({ json: { ok: true, id: "return-new" } }); });
-  await page.route("**/__test/review", async (route) => { calls.push(route.request().postDataJSON()); approved = true; await route.fulfill({ json: { ok: true, refund: 120 } }); });
+  const calls: Record<string, unknown>[] = [];
+  await page.route("**/api/returns/invoice?**", (route) => route.fulfill({ json: { sales: [returnSale], hasMore: false } }));
+  await page.route("**/__test/complete-return", async (route) => { calls.push(route.request().postDataJSON()); await route.fulfill({ json: { ok: true, id: "return-new", returnNumber: "RET-INSTANT", refund: 120 } }); });
   const panel = await cart(page); await panel.getByRole("button", { name: "Return / Refund" }).click();
   const dialog = page.getByRole("dialog", { name: "Return / Refund", exact: true });
-  await dialog.getByLabel("Invoice number").fill("QEI-TEST"); await dialog.getByRole("button", { name: "Find", exact: true }).click();
-  await dialog.getByLabel("Return quantity for Paracetamol strip").fill("2"); await dialog.getByLabel("Reason for return").fill("Unopened medicine");
-  await expect(dialog.getByText("Estimated refund").locator("..")).toContainText("120"); await noOverflow(page);
-  await dialog.getByRole("button", { name: "Send Return Request" }).click();
-  await expect.poll(() => calls.length).toBe(1);
-  expect(calls[0]).toMatchObject({ saleId: sale.id, reason: "Unopened medicine", items: [{ sale_item_id: saleItem.id, quantity: 2 }] });
-  if (role === "owner") {
-    await dialog.getByRole("button", { name: "Review", exact: true }).click();
-    const review = page.getByRole("dialog", { name: "Review return" });
-    await review.getByRole("checkbox").check(); await review.getByRole("button", { name: "Approve Refund" }).click();
-    await expect.poll(() => calls.length).toBe(2);
-    expect(calls[1]).toMatchObject({ returnId: "return-new", approve: true, items: [{ return_item_id: "line-new", approved_quantity: 2, restockable: true }] });
-    await expect(dialog.getByRole("button", { name: "Review", exact: true })).toHaveCount(0);
-  } else await expect(dialog.getByRole("button", { name: "Review", exact: true })).toHaveCount(0);
+  await dialog.getByRole("button", { name: /QEI-TEST-0001/ }).click();
+  await dialog.getByLabel("Return quantity for Paracetamol strip").fill("2");
+  await dialog.getByLabel("Reason for return").fill("Unopened medicine");
+  await dialog.getByRole("checkbox").check();
+  await expect(dialog.getByText("Refund amount").locator("..")).toContainText("120"); await noOverflow(page);
+  await dialog.getByRole("button", { name: "Complete Return", exact: true }).click();
+  await expect(dialog.getByRole("heading", { name: "Return completed" })).toBeVisible();
+  expect(calls).toHaveLength(1);
+  expect(calls[0]).toMatchObject({ saleId: sale.id, reason: "Unopened medicine", items: [{ sale_item_id: saleItem.id, quantity: 2, restockable: true }] });
+  await expect(dialog.getByRole("button", { name: "Review", exact: true })).toHaveCount(0);
 });
 
 test("server discount rejection unlocks the cart for a corrected price", async ({ page }) => {

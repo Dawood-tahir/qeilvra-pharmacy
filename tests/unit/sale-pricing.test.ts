@@ -10,4 +10,9 @@ describe("sale-only prices and refund estimates", () => {
     expect(refundMinor(10, 3, 0, 3)).toBe(1000);
   });
   it("uses the discounted original line amount", () => expect(refundMinor(180, 3, 0, 2)).toBe(12000));
+  it("preserves legacy fractional-paisa allocations until refund rounding", () => {
+    expect(refundMinor(1.005, 1, 0, 1)).toBe(101);
+    expect(refundMinor(35 * 840 / 850, 5, 0, 2)).toBe(1384);
+    expect(refundMinor(1e-8, 1, 0, 1)).toBe(0);
+  });
 });

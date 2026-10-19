@@ -4,6 +4,7 @@ export async function receiveStockAction(id:string,stock:unknown,key:string) { r
 export async function createPurchaseAction(data: unknown) { return submit("/__test/purchase", data); }
 export async function postPurchaseAction(data: FormData) { return submit("/__test/post", Object.fromEntries(data)); }
 export async function requestReturnAction(data: unknown) { return submit("/__test/return", data); }
+export async function completeReturnAction(data: unknown) { return submit("/__test/complete-return", data); }
 export async function reviewReturnAction(data: unknown) { return submit("/__test/review", data); }
 export async function createExpenseAction(data: FormData) { return submit("/__test/expense", Object.fromEntries(data)); }
 export async function createExpenseCategoryAction(data: FormData) { return submit("/__test/category", Object.fromEntries(data)); }

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { medicine, purchase, sale, suppliers } from "../ui/data";
+import { medicine, purchase, sale, suppliers, returnSale } from "../ui/data";
 
 async function mockMedicines(page: Page) {
   await page.route("**/api/medicines/search?**", (route) => route.fulfill({ json: [medicine] }));
@@ -154,25 +154,24 @@ test("POS supports direct quantities and scanner keyboard use inside the actual 
   await expect(page.getByText("Only 200 tablets are available.")).toBeVisible();
 });
 
-test("receipt return request identifies invoice, preserves unit and manages focus", async ({ page }) => {
+test("receipt return uses the same immediate refund dialog and preserves focus", async ({ page }) => {
   let payload: unknown;
-  await page.route("**/__test/return", async (route) => { payload = route.request().postDataJSON(); await route.fulfill({ json: { ok: true, id: "return" } }); });
+  await page.route("**/api/returns/invoice?**", route => route.fulfill({json:{sales:[returnSale],hasMore:false}}));
+  await page.route("**/__test/complete-return", async (route) => { payload = route.request().postDataJSON(); await route.fulfill({ json: { ok: true, id: "return", returnNumber: "RET-TEST", refund: 60 } }); });
   await page.goto("/?flow=receipt&shell=1");
-  const trigger = page.getByRole("button", { name: "Request return", exact: true });
+  const trigger = page.getByRole("button", { name: "Return / Refund", exact: true });
   await trigger.click();
-  const dialog = page.getByRole("dialog", { name: "Request a return" });
-  await expect(dialog.getByText("Invoice " + sale.invoice_number)).toBeVisible();
-  await expect(dialog.getByText("Sold: 3 strips")).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Return / Refund" });
+  await expect(dialog.getByText(sale.invoice_number, {exact:true})).toBeVisible();
+  await expect(dialog.getByText(/Sold: 3 strips/)).toBeVisible();
   await dialog.getByLabel("Return quantity for Paracetamol strip").fill("1");
   await dialog.getByLabel("Reason for return").fill("One sealed strip returned");
   for (let index = 0; index < 6; index++) { await page.keyboard.press("Tab"); expect(await page.evaluate(() => document.activeElement?.closest("dialog") !== null)).toBe(true); }
-  await noOverflow(page);
-  await page.keyboard.press("Escape");
-  await expect(trigger).toBeFocused();
-  await trigger.click();
-  await dialog.getByRole("button", { name: "Send Return Request" }).click();
-  await expect(dialog).toHaveCount(0);
-  expect(payload).toMatchObject({ saleId: sale.id, reason: "One sealed strip returned", items: [{ sale_item_id: sale.sale_items[0].id, quantity: 1 }] });
+  await noOverflow(page); await page.keyboard.press("Escape"); await expect(trigger).toBeFocused();
+  await trigger.click(); await dialog.getByLabel("Return quantity for Paracetamol strip").fill("1"); await dialog.getByLabel("Reason for return").fill("One sealed strip returned");
+  await dialog.getByRole("button", {name:"Complete Return",exact:true}).click();
+  await expect(dialog.getByRole("heading", {name:"Return completed"})).toBeVisible();
+  expect(payload).toMatchObject({saleId:sale.id,reason:"One sealed strip returned",items:[{sale_item_id:sale.sale_items[0].id,quantity:1,restockable:false}]});
 });
 
 test("Owner return review clearly separates approved quantity and restocking", async ({ page }) => {

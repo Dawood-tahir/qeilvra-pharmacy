@@ -5,6 +5,23 @@ import { z } from "zod";
 import { requireOwner, requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { saveOutcomeUnknown } from "@/lib/save-result";
+import { completeReturnSchema } from "@/lib/instant-return";
+
+export async function completeReturnAction(input: unknown) {
+  await requireStaff();
+  const parsed = completeReturnSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0]?.message ?? "Check the return details." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("complete_sale_return", {
+    p_sale_id: parsed.data.saleId, p_items: parsed.data.items, p_reason: parsed.data.reason,
+    p_key: parsed.data.idempotencyKey, p_payment_method: parsed.data.paymentMethod, p_card_confirmed: parsed.data.cardConfirmed,
+  });
+  if (error) return { ok: false as const, uncertain: saveOutcomeUnknown(error.code) || error.code === "42501" || error.message.startsWith("Return key already used"), error: error.code === "P0001" ? error.message : "The return could not be confirmed. Retry the same return to check its status." };
+  if (!data?.id || typeof data.refund !== "number" || !data.return_number) return { ok: false as const, uncertain: true, error: "The return could not be confirmed. Retry the same return." };
+  for (const path of ["/returns", "/dashboard", "/stock", "/medicines", "/pos", "/reports", "/sales"]) revalidatePath(path);
+  revalidatePath("/suppliers/[id]", "page"); revalidatePath("/sales/[id]", "page");
+  return { ok: true as const, id: String(data.id), returnNumber: String(data.return_number), refund: Number(data.refund) };
+}
 
 export async function requestReturnAction(input: unknown) {
   await requireStaff();

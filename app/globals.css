@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@keyframes sidebar-enter { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+@keyframes sidebar-exit { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+.sidebar-opening { animation: sidebar-enter 160ms ease-out; }
+.sidebar-closing { animation: sidebar-exit 160ms ease-in forwards; }
+@media (prefers-reduced-motion: reduce) { .sidebar-opening, .sidebar-closing { animation: none; } }
+
 :root {
   --background: #f5f8fd;
   --foreground: #0f172a;

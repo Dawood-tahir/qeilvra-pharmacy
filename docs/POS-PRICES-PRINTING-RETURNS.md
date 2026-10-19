@@ -6,14 +6,16 @@ Apply `supabase/migrations/202610190008_custom_sale_prices.sql` through your nor
 
 An older database rejects changed prices instead of silently charging the catalogue price. Ordinary catalogue-priced checkout remains compatible.
 
+The immediate return update also requires `supabase/migrations/202610190009_instant_returns.sql` before application deployment. It is a function-only change and has been verified locally, not applied to production.
+
 ## Counter workflow
 
 - **Change Price** on a medicine card changes the selected selling unit for this sale; the cart uses the same price. Editing a cart price updates the matching card. Next sale clears these overrides. Permanent medicine prices are never updated.
 - The transaction reads the authenticated role and the configured discount limit. For Salespeople, all price reductions plus the invoice discount share that limit, calculated against catalogue subtotal. Markups cannot cancel reductions to bypass the limit. Owners can authorize reductions beyond this limit; configured maximum unit prices still apply.
 - Cash checkout requires enough cash and shows change. Card checkout requires the operator to confirm payment on an external terminal; the app records that confirmation and does not charge a card itself.
 - The request UUID and exact payload are saved before checkout. Network failures retain that request and lock editing; **Retry Sale** retrieves the same transaction. A confirmed database rejection unlocks editing. Browser storage is required to start checkout safely.
-- **Return / Refund** searches existing invoices using existing access rules. Salespeople can search their own invoices and request returns. Owners can review pending requests in the POS dialog or the existing Returns screen. Refund estimates use saved charged line amounts after invoice discounts. Approval remains the existing locked database transaction; it rejects excessive quantities and repeat approval. Stock is restored only when the Owner marks it suitable for resale, and the original batches are still sellable.
-- Return submissions with uncertain outcomes must be checked in Returns before being submitted again. The return-request RPC has no idempotency-key argument; the app does not automatically retry it. Refund approval itself is protected against duplicate execution by the existing database transaction.
+- **Return / Refund** automatically lists recent accessible sales and optionally searches by invoice, medicine or pharmacy-local date. Both roles complete returns immediately; Salespeople retain their own-sale access boundary. Refunds use original charged prices and discounts. Only medicine explicitly suitable for resale is restored to its original eligible batches. Existing historical requests remain in Returns for Owner resolution.
+- Immediate returns use `complete_sale_return` with a persisted, staff-scoped retry key. Unknown outcomes lock editing and retain the same payload across dialog reopening and refresh. Retrying checks the original transaction; sale locks also prevent distinct concurrent requests from over-refunding. See `INSTANT-RETURNS.md` for migration, authorization and test details.
 
 ## Windows USB thermal printer
 

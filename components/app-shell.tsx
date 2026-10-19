@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, Pill, Boxes, Truck, ContactRound, BarChart3,
   WalletCards, Users, Settings, Bell, Search, X, LogOut,
-  AlertTriangle, MoreHorizontal, RotateCcw,
+  AlertTriangle, MoreHorizontal, RotateCcw, Menu,
   ScrollText, ReceiptText,
 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
@@ -49,6 +49,26 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
   const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const drawerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeDrawer = useCallback(() => {
+    setClosing(true);
+    drawerTimer.current = setTimeout(() => { setMobileOpen(false); setClosing(false); }, 160);
+  }, []);
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => { if (active) { try { setCollapsed(localStorage.getItem("qeilvra-sidebar") === "collapsed"); } catch {} } });
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const onResize = () => { if (desktop.matches) { setMobileOpen(false); setClosing(false); } };
+    desktop.addEventListener("change", onResize);
+    return () => { active = false; desktop.removeEventListener("change", onResize); if (drawerTimer.current) clearTimeout(drawerTimer.current); };
+  }, []);
+  function toggleSidebar() {
+    setCollapsed((value) => { try { localStorage.setItem("qeilvra-sidebar", value ? "expanded" : "collapsed"); } catch {} return !value; });
+  }
+
   const nav = staff.role === "owner" ? ownerNav : salespersonNav;
 
   const isActive = useCallback((href: string) => pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`)), [pathname]);
@@ -71,26 +91,26 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
   }, [router]);
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[260px_minmax(0,1fr)] print:block print:min-h-0">
-      <aside className="no-print fixed inset-y-0 left-0 z-40 hidden w-[260px] flex-col overflow-hidden bg-[linear-gradient(160deg,#071b45_0%,#0b4380_72%,#0c617a_120%)] text-white shadow-xl lg:flex">
-        <div className="p-6"><BrandMark light /></div>
+    <div className={cn("min-h-screen transition-[grid-template-columns] duration-200 motion-reduce:transition-none lg:grid print:block print:min-h-0", collapsed ? "lg:grid-cols-[80px_minmax(0,1fr)]" : "lg:grid-cols-[260px_minmax(0,1fr)]")}>
+      <aside id="desktop-sidebar" className={cn("no-print fixed inset-y-0 left-0 z-40 hidden flex-col overflow-hidden bg-[linear-gradient(160deg,#071b45_0%,#0b4380_72%,#0c617a_120%)] text-white shadow-xl transition-[width] duration-200 motion-reduce:transition-none lg:flex", collapsed ? "w-20" : "w-[260px]")}>
+        <div className={cn("p-3", collapsed && "flex flex-col items-center")}><Button variant="ghost" size="icon" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-controls="desktop-sidebar" aria-expanded={!collapsed} onClick={toggleSidebar} className="text-white hover:bg-white/10 hover:text-white"><Menu /></Button><div className={collapsed ? "py-3" : "px-3 py-3"}><BrandMark light compact={collapsed} /></div></div>
         <nav className="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-3 py-2" aria-label="Primary navigation">
           {nav.map(({ href, label, icon: Icon }) => (
-            <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} aria-current={isActive(href) ? "page" : undefined} className={cn("flex h-12 items-center gap-3 rounded-xl px-4 text-sm font-medium text-blue-100 transition hover:bg-white/10 hover:text-white", isActive(href) && "bg-blue-500/70 text-white shadow-sm ring-1 ring-white/20")}>
-              <Icon className="size-5" /><span>{label}</span>
+            <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} title={collapsed ? label : undefined} aria-label={label} aria-current={isActive(href) ? "page" : undefined} className={cn("flex h-12 items-center gap-3 rounded-xl px-4 text-sm font-medium text-blue-100 transition hover:bg-white/10 hover:text-white", isActive(href) && "bg-blue-500/70 text-white shadow-sm ring-1 ring-white/20", collapsed && "justify-center px-0")}>
+              <Icon className="size-5 shrink-0" /><span className={collapsed ? "sr-only" : undefined}>{label}</span>
             </Link>
           ))}
         </nav>
-        <div className="m-4 rounded-2xl border border-white/10 bg-white/8 p-4">
+        <div className={cn("m-4 rounded-2xl border border-white/10 bg-white/8 p-4", collapsed && "hidden")}>
           <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-white/10 font-bold">Q</span><span><span className="block text-sm font-bold">Qeilvra</span><span className="block text-[10px] text-blue-200">Secure pharmacy operations</span></span></div>
         </div>
-        <form action="/auth/signout" method="post" className="px-4 pb-4"><Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10 hover:text-white"><LogOut /> Sign out</Button></form>
+        <form action="/auth/signout" method="post" className="px-4 pb-4"><Button variant="ghost" aria-label="Sign out" title={collapsed ? "Sign out" : undefined} className={cn("w-full justify-start text-white hover:bg-white/10 hover:text-white", collapsed && "justify-center px-0")}><LogOut /><span className={collapsed ? "sr-only" : undefined}>Sign out</span></Button></form>
       </aside>
 
       <div className="min-w-0 lg:col-start-2">
         <header className="no-print sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:h-[72px] lg:px-8">
-            <div className="lg:hidden"><BrandMark compact /></div>
+            <Button variant="ghost" size="icon" className="shrink-0 lg:hidden" aria-label="Open navigation menu" aria-expanded={mobileOpen} aria-controls="mobile-sidebar" onClick={() => { setClosing(false); setMobileOpen(true); }}><Menu /></Button><div className="lg:hidden"><BrandMark compact /></div>
             <button onClick={() => setSearchOpen(true)} className="hidden h-11 max-w-xl flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 text-left text-sm text-slate-500 hover:border-blue-300 hover:bg-white sm:flex">
               <Search className="size-4" /><span className="truncate">Search medicines, invoices…</span><kbd className="ml-auto rounded border bg-white px-2 py-0.5 text-[10px] text-slate-400">Ctrl K</kbd>
             </button>
@@ -127,6 +147,9 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
           </div>
           <form action="/auth/signout" method="post" className="mt-3"><Button variant="outline" className="w-full text-red-600"><LogOut /> Sign out</Button></form>
         </div>
+      </Dialog>}
+      {mobileOpen && <Dialog label="Navigation menu" onClose={closeDrawer} busy={closing} className={cn("inset-y-0 left-0 right-auto m-0 flex h-dvh max-h-dvh w-[min(300px,85vw)] max-w-none flex-col rounded-none bg-[linear-gradient(160deg,#071b45_0%,#0b4380_72%,#0c617a_120%)] p-3 text-white sm:p-3", closing ? "sidebar-closing" : "sidebar-opening")}>
+        <div id="mobile-sidebar" className="flex h-full min-h-0 flex-col"><div className="flex items-center gap-3 pb-4"><Button variant="ghost" size="icon" aria-label="Close navigation menu" onClick={closeDrawer} className="shrink-0 text-white hover:bg-white/10 hover:text-white"><Menu /></Button><BrandMark light /></div><nav aria-label="Mobile sidebar navigation" className="scrollbar-thin min-h-0 flex-1 space-y-1 overflow-y-auto">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} prefetch={pathname === "/pos" ? false : null} aria-current={isActive(href) ? "page" : undefined} onClick={() => { setMobileOpen(false); setClosing(false); }} className={cn("flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm text-blue-100 hover:bg-white/10", isActive(href) && "bg-blue-500/70 text-white")}><Icon className="size-5 shrink-0" />{label}</Link>)}</nav><form action="/auth/signout" method="post" className="pt-4"><Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10 hover:text-white"><LogOut /> Sign out</Button></form></div>
       </Dialog>}
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
