@@ -13,6 +13,13 @@ beforeEach(() => {
   range.mockResolvedValue({ data: [], count: 0, error: null });
 });
 describe("complete Owner CSV exports", () => {
+  it("exports financial totals and daily rows from the same analytics calculation", async () => {
+    rpc.mockImplementation(async name => name === "current_role" ? { data: "owner" } : { data: { metrics: { sales_count: 1, gross_sales: 500, discounts: 50, refunds: 0, medicine_revenue: 450, extra_charge_revenue: 30, revenue: 480, cogs: 300, gross_profit: 180, expenses: 50, net_operating_profit: 130 }, daily: [] } });
+    const response = await GET(request("type=financials&from=2026-10-01&to=2026-10-19"));
+    expect(response.status).toBe(200); const text = await response.text();
+    expect(text).toContain('"Net Operating Profit"'); expect(text).toContain('"TOTAL","1","500","50","0","450","30","480","300","180","50","130"');
+    expect(rpc).toHaveBeenCalledWith("owner_financial_analytics", { p_from: "2026-10-01", p_to: "2026-10-19", p_granularity: "day" });
+  });
   it("rejects reversed dates before querying the database", async () => { expect((await GET(request("type=sales&from=2026-10-19&to=2026-10-01"))).status).toBe(400); expect(from).not.toHaveBeenCalled(); });
   it("requires authentication", async () => { getUser.mockResolvedValue({ data: { user: null } }); expect((await GET(request())).status).toBe(401); expect(from).not.toHaveBeenCalled(); });
   it("does not expose purchase costs to Salespeople", async () => { rpc.mockResolvedValue({ data: "salesperson" }); expect((await GET(request("type=inventory&from=2026-10-01&to=2026-10-19"))).status).toBe(403); expect(from).not.toHaveBeenCalled(); });

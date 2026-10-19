@@ -1,6 +1,8 @@
 import { medicine, metrics, purchase, tables } from "./data";
 import { localDateISO } from "@/lib/utils";
 import { supplierFixtureTables } from "./supplier-data";
+import { financialFixture } from "./financial-data";
+import { financeRange } from "@/lib/financial-analytics";
 
 class FixtureQuery {
   rows: Record<string, unknown>[];
@@ -42,6 +44,7 @@ export async function createClient() {
   return {
     from: (table: string) => new FixtureQuery(table),
     rpc: async (name: string, args: Record<string, unknown> = {}) => {
+      if (name === "owner_financial_analytics") return { data: financialFixture({ ...financeRange(String(new URLSearchParams(location.search).get("period") ?? "today")), from: String(args.p_from), to: String(args.p_to), granularity: args.p_granularity as "hour" | "day" }, new URLSearchParams(location.search).has("empty")), error: null };
       if (name === "owner_dashboard_metrics" || name === "salesperson_dashboard") return { data: metrics, error: null };
       if (name === "owner_expense_total") return { data: metrics.expenses, error: null };
       if (name === "owner_sales_trend") return { data: [{ sale_date: localDateISO(), revenue: 45000, gross_profit: 12000, sale_count: 20 }], error: null };

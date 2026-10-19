@@ -36,8 +36,17 @@ try{
  const queries={inventory:"select * from public.inventory_search('',30)",medicine_search:"select * from public.inventory_search('Perf Medicine 099',30)",metrics:"select public.owner_dashboard_metrics(current_date-30,current_date)",trend:"select * from public.owner_sales_trend(current_date-30,current_date)",returns:"select * from public.return_sales('',null,0,11,null)"};
  const report={dataset:{medicines:10000,batches:50000,sales:5000,costAllocations:5000},conditions:'Disposable PostgreSQL 18; execution time from EXPLAIN ANALYZE, no network',before:{},after:{}};
  for(const phase of ['before','after']){
+  if(process.env.ANALYTICS_ONLY==='1'&&phase==='before')continue;
   if(phase==='after')for(const name of fs.readdirSync('supabase/migrations').sort())if(name>='202610190010')file('supabase/migrations/'+name);
+  if(phase==='after'){
+   const today="(now() at time zone 'Asia/Karachi')::date";
+   queries.financial_today="select public.owner_financial_analytics("+today+","+today+",'hour')";
+   queries.financial_week="select public.owner_financial_analytics(date_trunc('week',now() at time zone 'Asia/Karachi')::date,"+today+")";
+   queries.financial_month="select public.owner_financial_analytics(date_trunc('month',now() at time zone 'Asia/Karachi')::date,"+today+")";
+   queries.financial_year="select public.owner_financial_analytics("+today+"-365,"+today+")";
+  }
   for(const [key,query]of Object.entries(queries)){
+   if(process.env.ANALYTICS_ONLY==='1'&&!key.startsWith('financial_'))continue;
    const values=[];
    for(let i=0;i<21;i++){const out=sql(auth+'explain (analyze,format json) '+query);const start=out.indexOf('[');const plan=JSON.parse(out.slice(start));if(i)values.push(plan[0]['Execution Time']);}
    report[phase][key]=stats(values);console.log(phase+' '+key+' '+JSON.stringify(report[phase][key]));

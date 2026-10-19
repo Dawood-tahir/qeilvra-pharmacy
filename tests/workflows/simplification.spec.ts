@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { medicine, purchase, sale, suppliers, returnSale } from "../ui/data";
+import { financialFixture } from "../ui/financial-data";
+import { financeRange } from "@/lib/financial-analytics";
 
 async function mockMedicines(page: Page) {
   await page.route("**/api/medicines/search?**", (route) => route.fulfill({ json: [medicine] }));
@@ -223,7 +225,9 @@ test("global search retries errors and finds an existing invoice by keyboard", a
 });
 
 test("date filters accept a different month in one apply", async ({ page }) => {
+  await page.route("**/api/reports/analytics?**", route => route.fulfill({ json: financialFixture(financeRange("custom", "2026-01-01", "2026-01-31")) }));
   await page.goto("/reports?shell=1");
+  await page.getByRole("button", { name: "Custom dates", exact: true }).click();
   const form = page.getByRole("form", { name: "Date range" });
   await form.getByLabel("From", { exact: true }).fill("2026-01-01");
   await form.getByLabel("To", { exact: true }).fill("2026-01-31");

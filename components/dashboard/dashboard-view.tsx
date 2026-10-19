@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo } from "react";
 import {
   ArrowUpRight, BarChart3, Boxes, CalendarDays, ChevronRight, CircleAlert, Clock3, PackagePlus,
-  Pill, Plus, ReceiptText, ShoppingCart, TrendingUp, TriangleAlert,
+  Pill, Plus, ReceiptText, ShoppingCart, TriangleAlert,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { LazySalesChart as SalesChart, type TrendPoint } from "@/components/dashboard/lazy-sales-chart";
+import { FinancialAnalytics } from "@/components/dashboard/financial-analytics";
+import type { FinancialSnapshot, FinanceRange } from "@/lib/financial-analytics";
 import { cn, formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import type { AppRole } from "@/lib/auth";
 
@@ -35,13 +34,10 @@ function KpiCard({ title, value, helper, icon: Icon, tone = "blue" }: { title: s
   return <Card className="min-w-0"><CardContent className="p-4 sm:p-5"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs font-semibold text-slate-500 sm:text-sm">{title}</p><p className="mt-1 break-words text-lg font-extrabold tracking-tight text-slate-950 sm:text-2xl tabular-nums">{value}</p></div><span className={cn("hidden size-10 shrink-0 place-items-center rounded-xl sm:grid", styles[tone])}><Icon className="size-5" /></span></div><p className="mt-3 text-[11px] text-slate-500 sm:text-xs">{helper}</p></CardContent></Card>;
 }
 
-export function DashboardView({ role, name, metrics, todaySales, trend, lowStock, expiring, recentSales, period }: { role: AppRole; name: string; metrics: Metrics; todaySales: number; trend: TrendPoint[]; lowStock: Alert[]; expiring: Alert[]; recentSales: RecentSale[]; period: string }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+export function DashboardView({ role, name, metrics, financial, range, lowStock, expiring, recentSales }: { role: AppRole; name: string; metrics: Metrics; financial?: FinancialSnapshot; range: FinanceRange; lowStock: Alert[]; expiring: Alert[]; recentSales: RecentSale[] }) {
   const firstName = name.split(" ")[0];
   const owner = role === "owner";
-  const periods = useMemo(() => [{ id: "7d", label: "7 days" }, { id: "30d", label: "30 days" }, { id: "month", label: "This month" }], []);
-  const setPeriod = (value: string) => { const params = new URLSearchParams(searchParams); params.set("period", value); router.replace(`/dashboard?${params}`); };
+
 
   return (
     <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
@@ -52,24 +48,19 @@ export function DashboardView({ role, name, metrics, todaySales, trend, lowStock
 
       {!owner && <Link href="/pos" className="mb-4 flex min-h-16 items-center justify-between rounded-2xl bg-gradient-to-r from-blue-700 to-blue-500 p-4 text-white shadow-lg shadow-blue-200"><span className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-xl bg-white/15"><ShoppingCart /></span><span><span className="block text-lg font-bold">Start a new sale</span><span className="block text-xs text-blue-100">Search, scan and checkout</span></span></span><ArrowUpRight /></Link>}
 
-      {owner && <div className="mb-4 flex flex-wrap items-center gap-2"><span className="text-sm font-semibold text-slate-600">Report period</span><div role="group" aria-label="Report period" className="flex rounded-xl bg-slate-100 p-1">{periods.map((item) => <button key={item.id} aria-pressed={period === item.id} onClick={() => setPeriod(item.id)} className={cn("min-h-11 rounded-lg px-3 text-xs font-semibold", period === item.id ? "bg-white text-blue-700 shadow-sm" : "text-slate-600")}>{item.label}</button>)}</div></div>}
-      <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Key performance indicators">
-        {owner ? <>
-          <KpiCard title="Today's Sales" value={formatCurrency(todaySales)} helper="Net of discounts and approved returns" icon={ShoppingCart} tone="green" />
-          <KpiCard title="Revenue" value={formatCurrency(metrics.revenue)} helper="Selected period · not profit" icon={TrendingUp} />
-          <KpiCard title="Total Medicines" value={String(metrics.total_medicines ?? 0)} helper="Active catalogue items" icon={Pill} tone="orange" />
-          <KpiCard title="Low Stock Items" value={String(metrics.low_stock_items ?? 0)} helper={`${metrics.out_of_stock_items ?? 0} unavailable`} icon={TriangleAlert} tone="red" />
-        </> : <>
+      {owner && financial && <FinancialAnalytics initialData={financial} initialRange={range} />}
+      {!owner && <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Key performance indicators">
+        <>
+
           <KpiCard title="My Sales Today" value={formatCurrency(metrics.today_sales)} helper={`${metrics.today_transactions ?? 0} transactions`} icon={ShoppingCart} tone="green" />
           <KpiCard title="Low Stock" value={String(metrics.low_stock_items ?? 0)} helper="Items needing attention" icon={TriangleAlert} tone="orange" />
           <KpiCard title="Unavailable" value={String(metrics.out_of_stock_items ?? 0)} helper="Out of stock medicines" icon={Boxes} tone="red" />
           <KpiCard title="Quick Search" value="Medicines" helper="View prices, stock and expiry" icon={Pill} />
-        </>}
-      </section>
+        </>
+      </section>}
 
-      {owner && <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,.65fr)]">
-        <Card className="min-w-0"><CardHeader className="flex-wrap items-center justify-between"><div><CardTitle className="flex items-center gap-2"><BarChart3 className="size-5 text-blue-600" /> Sales & Revenue Overview</CardTitle><p className="mt-1 text-xs text-slate-500">Revenue is net sales; green is gross profit before expenses.</p></div></CardHeader><CardContent><SalesChart data={trend} /></CardContent></Card>
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Boxes className="size-5 text-blue-600" /> Stock Status</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-3 gap-2 text-center"><div className="rounded-xl bg-emerald-50 p-3"><p className="text-xl font-extrabold text-emerald-700">{Math.max((metrics.total_medicines ?? 0) - (metrics.low_stock_items ?? 0) - (metrics.out_of_stock_items ?? 0), 0)}</p><p className="mt-1 text-[10px] font-semibold text-emerald-700">In stock</p></div><div className="rounded-xl bg-amber-50 p-3"><p className="text-xl font-extrabold text-amber-700">{metrics.low_stock_items ?? 0}</p><p className="mt-1 text-[10px] font-semibold text-amber-700">Low</p></div><div className="rounded-xl bg-red-50 p-3"><p className="text-xl font-extrabold text-red-700">{metrics.out_of_stock_items ?? 0}</p><p className="mt-1 text-[10px] font-semibold text-red-700">Out</p></div></div><div className="rounded-xl border border-slate-100 p-3"><div className="flex justify-between text-sm"><span className="text-slate-500">Gross profit</span><strong>{formatCurrency(metrics.gross_profit)}</strong></div><div className="mt-2 flex justify-between text-sm"><span className="text-slate-500">Expenses</span><strong className="text-red-600">{formatCurrency(metrics.expenses)}</strong></div><div className="mt-3 flex justify-between border-t pt-3"><span className="min-w-0 font-semibold">Net operating result</span><strong className={(metrics.net_operating_result ?? 0) < 0 ? "text-red-600" : "text-emerald-700"}>{formatCurrency(metrics.net_operating_result)}</strong></div></div></CardContent></Card>
+      {owner && <div className="mt-4">
+        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Boxes className="size-5 text-blue-600" /> Stock Status</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-3 gap-2 text-center"><div className="rounded-xl bg-emerald-50 p-3"><p className="text-xl font-extrabold text-emerald-700">{Math.max((metrics.total_medicines ?? 0) - (metrics.low_stock_items ?? 0) - (metrics.out_of_stock_items ?? 0), 0)}</p><p className="mt-1 text-[10px] font-semibold text-emerald-700">In stock</p></div><div className="rounded-xl bg-amber-50 p-3"><p className="text-xl font-extrabold text-amber-700">{metrics.low_stock_items ?? 0}</p><p className="mt-1 text-[10px] font-semibold text-amber-700">Low</p></div><div className="rounded-xl bg-red-50 p-3"><p className="text-xl font-extrabold text-red-700">{metrics.out_of_stock_items ?? 0}</p><p className="mt-1 text-[10px] font-semibold text-red-700">Out</p></div></div><p className="text-xs text-slate-500">{metrics.total_medicines ?? 0} active medicines in Inventory.</p></CardContent></Card>
       </div>}
 
       <section className="mt-4 grid gap-4 xl:grid-cols-2">
