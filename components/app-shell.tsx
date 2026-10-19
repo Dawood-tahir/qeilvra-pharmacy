@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, Pill, Boxes, Truck, ContactRound, BarChart3,
   WalletCards, Users, Settings, Bell, Search, X, LogOut,
@@ -10,13 +10,14 @@ import {
   ScrollText, ReceiptText,
 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
-import { GlobalSearch } from "@/components/global-search";
+import { DialogLoading } from "@/components/ui/dialog-loading";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { cn, getInitials } from "@/lib/utils";
 import type { StaffUser } from "@/lib/auth";
 
 type NavItem = { label: string; href: string; icon: typeof LayoutDashboard };
+const GlobalSearch = lazy(() => import("@/components/global-search").then(module => ({ default: module.GlobalSearch })));
 
 const ownerNav: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -151,7 +152,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
       {mobileOpen && <Dialog label="Navigation menu" onClose={closeDrawer} busy={closing} className={cn("inset-y-0 left-0 right-auto m-0 flex h-dvh max-h-dvh w-[min(300px,85vw)] max-w-none flex-col rounded-none bg-[linear-gradient(160deg,#071b45_0%,#0b4380_72%,#0c617a_120%)] p-3 text-white sm:p-3", closing ? "sidebar-closing" : "sidebar-opening")}>
         <div id="mobile-sidebar" className="flex h-full min-h-0 flex-col"><div className="flex items-center gap-3 pb-4"><Button variant="ghost" size="icon" aria-label="Close navigation menu" onClick={closeDrawer} className="shrink-0 text-white hover:bg-white/10 hover:text-white"><Menu /></Button><BrandMark light /></div><nav aria-label="Mobile sidebar navigation" className="scrollbar-thin min-h-0 flex-1 space-y-1 overflow-y-auto">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} prefetch={pathname === "/pos" ? false : null} aria-current={isActive(href) ? "page" : undefined} onClick={() => { setMobileOpen(false); setClosing(false); }} className={cn("flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm text-blue-100 hover:bg-white/10", isActive(href) && "bg-blue-500/70 text-white")}><Icon className="size-5 shrink-0" />{label}</Link>)}</nav><form action="/auth/signout" method="post" className="pt-4"><Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10 hover:text-white"><LogOut /> Sign out</Button></form></div>
       </Dialog>}
-      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+      {searchOpen && <Suspense fallback={<DialogLoading label="Global search" onClose={() => setSearchOpen(false)} />}><GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} /></Suspense>}
     </div>
   );
 }

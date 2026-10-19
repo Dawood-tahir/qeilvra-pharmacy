@@ -37,7 +37,8 @@ export function RestockForm({ initialMedicine = null, initialSupplierId = "", su
       try {
         const response = await fetch("/api/medicines/search?q=" + encodeURIComponent(query) + "&limit=10", { signal: controller.signal, cache: "no-store" });
         if (!response.ok) throw new Error();
-        setResults(await response.json()); setError("");
+        const data = await response.json();
+        if (!controller.signal.aborted) { setResults(data); setError(""); }
       } catch { if (!controller.signal.aborted) setError("Could not find medicines. Check your connection and try again."); }
       finally { if (!controller.signal.aborted) setLoading(false); }
     }, 200);

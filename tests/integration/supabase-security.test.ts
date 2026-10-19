@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 const env={url:process.env.SUPABASE_TEST_URL,key:process.env.SUPABASE_TEST_PUBLISHABLE_KEY,ownerEmail:process.env.TEST_OWNER_EMAIL,ownerPassword:process.env.TEST_OWNER_PASSWORD,salespersonEmail:process.env.TEST_SALESPERSON_EMAIL,salespersonPassword:process.env.TEST_SALESPERSON_PASSWORD};
-describe.skipIf(!Object.values(env).every(Boolean))("configured Supabase HTTP role and concurrency contracts",()=>{
+// These contracts commit fixtures. Require an explicit disposable-project opt-in.
+describe.skipIf(!Object.values(env).every(Boolean) || process.env.SUPABASE_ALLOW_TEST_WRITES !== "disposable-only")("configured Supabase HTTP role and concurrency contracts",()=>{
  it("enforces cost privacy and serializes competing checkout",async()=>{
   const owner=createClient(env.url!,env.key!,{auth:{persistSession:false}});
   const salesperson=createClient(env.url!,env.key!,{auth:{persistSession:false}});

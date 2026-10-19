@@ -43,6 +43,7 @@ export async function createClient() {
     from: (table: string) => new FixtureQuery(table),
     rpc: async (name: string, args: Record<string, unknown> = {}) => {
       if (name === "owner_dashboard_metrics" || name === "salesperson_dashboard") return { data: metrics, error: null };
+      if (name === "owner_expense_total") return { data: metrics.expenses, error: null };
       if (name === "owner_sales_trend") return { data: [{ sale_date: localDateISO(), revenue: 45000, gross_profit: 12000, sale_count: 20 }], error: null };
       if (name === "owner_report_breakdowns") return { data: { medicine_sales: [{ medicine_id: medicine.id, medicine_name: medicine.name, quantity: 30, revenue: 195 }], salesperson_performance: [{ id: "staff", full_name: "Test Salesperson", sales_count: 20, revenue: 45000 }], purchase_total: 400, refund_total: 65, return_count: 1 }, error: null };
       if (name === "receipt_settings") return { data: tables.pharmacy_settings, error: null };

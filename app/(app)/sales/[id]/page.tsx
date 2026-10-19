@@ -15,10 +15,11 @@ export default async function SaleDetailPage({ params, searchParams }: { params:
   const print = options.print === "thermal";
   const paperWidth = options.width === "58" ? "58mm" : "80mm";
   const supabase = await createClient();
-  const [{ data: sale }, { data: settings }] = await Promise.all([
+  const [{ data: sale, error: saleError }, { data: settings, error: settingsError }] = await Promise.all([
     supabase.from("sales").select("*,sale_items(id,medicine_name,medicine_sku,quantity,unit_price,line_total,unit_label,base_units_per_sale_unit),payments(kind,method,amount,tendered_amount,change_amount,reference),sale_returns(id,return_number,status,refund_amount),profiles!sales_created_by_fkey(full_name)").eq("id", id).single(),
     supabase.rpc("receipt_settings"),
   ]);
+  if (settingsError || (saleError && saleError.code !== "PGRST116")) throw new Error("Invoice could not be loaded. Please try again.");
   if (!sale) notFound();
   const pharmacy = (settings as Array<Record<string, string>> | null)?.[0] ?? {};
   const items = sale.sale_items ?? [];

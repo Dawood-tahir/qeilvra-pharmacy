@@ -32,7 +32,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       supabase.rpc("inventory_alerts", { p_kind: "expiring", p_limit: 6 }),
       supabase.from("sales").select("id,invoice_number,net_total,completed_at,status,sale_items(count),payments(method)").order("completed_at", { ascending: false }).limit(8),
     ]);
-    const recentSales = (salesResult.data ?? []).map((sale: Record<string, unknown>) => ({
+    if ([metricsResult, todayResult, trendResult, lowResult, expiringResult, salesResult].some(result => result.error)) throw new Error("Dashboard could not be loaded. Please try again.");
+    if ([metricsResult, lowResult, expiringResult, salesResult].some(result => result.error)) throw new Error("Dashboard could not be loaded. Please try again.");
+  const recentSales = (salesResult.data ?? []).map((sale: Record<string, unknown>) => ({
       ...sale,
       item_count: (sale.sale_items as { count: number }[] | undefined)?.[0]?.count ?? 0,
       payment_method: (sale.payments as { method: string }[] | undefined)?.[0]?.method,

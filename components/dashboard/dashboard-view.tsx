@@ -10,7 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SalesChart, type TrendPoint } from "@/components/dashboard/sales-chart";
+import { LazySalesChart as SalesChart, type TrendPoint } from "@/components/dashboard/lazy-sales-chart";
 import { cn, formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import type { AppRole } from "@/lib/auth";
 

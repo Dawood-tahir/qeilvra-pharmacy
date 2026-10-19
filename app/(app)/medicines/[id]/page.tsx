@@ -12,9 +12,11 @@ export default async function MedicineDetailPage({ params }: { params: Promise<{
   const staff = await requireStaff();
   const { id } = await params;
   const supabase = await createClient();
-  const { data: medicine } = await supabase.from("medicines").select("id,name,generic_name,manufacturer,strength,dosage_form,barcode,sku,selling_price,reorder_level,base_unit,units_per_pack,is_active,packaging_status,tablets_per_strip,strips_per_box,medicine_units(unit_key,label,base_quantity,selling_price,max_price),medicine_categories(name)").eq("id", id).single();
+  const { data: medicine, error: medicineError } = await supabase.from("medicines").select("id,name,generic_name,manufacturer,strength,dosage_form,barcode,sku,selling_price,reorder_level,base_unit,units_per_pack,is_active,packaging_status,tablets_per_strip,strips_per_box,medicine_units(unit_key,label,base_quantity,selling_price,max_price),medicine_categories(name)").eq("id", id).single();
+  if (medicineError && medicineError.code !== "PGRST116") throw new Error("Medicine could not be loaded. Please try again.");
   if (!medicine) notFound();
-  const { data: inventory } = await supabase.rpc("search_sellable_medicines", { p_query: medicine.sku, p_limit: 2, p_offset: 0 });
+  const { data: inventory, error: inventoryError } = await supabase.rpc("search_sellable_medicines", { p_query: medicine.sku, p_limit: 2, p_offset: 0 });
+  if (inventoryError) throw new Error("Current stock could not be loaded. Please try again.");
   const stock = ((inventory ?? []) as Array<Record<string, unknown>>).find((item) => item.id === id);
   let batches: Array<Record<string, unknown>> = [];
   let cost: { default_purchase_cost: number } | null = null;
@@ -23,6 +25,7 @@ export default async function MedicineDetailPage({ params }: { params: Promise<{
       supabase.from("medicine_batches").select("id,batch_number,expiry_date,quantity_on_hand,purchase_cost,is_quarantined,suppliers(name)").eq("medicine_id", id).order("expiry_date"),
       supabase.from("medicine_costs").select("default_purchase_cost").eq("medicine_id", id).maybeSingle(),
     ]);
+    if (batchResult.error || costResult.error) throw new Error("Batch details could not be loaded. Please try again.");
     batches = batchResult.data ?? []; cost = costResult.data;
   }
   return <main className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8"><div className="flex flex-wrap items-center justify-between gap-4"><Link href="/medicines" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600"><ArrowLeft className="size-4" /> Medicines</Link>{staff.role === "owner" && <Link href={`/medicines/${id}/edit`} className={buttonVariants({ variant: "outline" })}><Edit3 /> Edit Medicine & Prices</Link>}</div><div className="mt-5 flex items-start gap-4"><span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-blue-100 text-blue-700"><Pill className="size-7" /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-extrabold sm:text-3xl">{medicine.name} {medicine.strength}</h1><Badge variant={medicine.is_active ? "success" : "neutral"}>{medicine.is_active ? "Active" : "Archived"}</Badge></div><p className="mt-1 text-sm text-slate-500">{[medicine.generic_name, medicine.dosage_form, medicine.manufacturer].filter(Boolean).join(" · ") || "No additional description"}</p></div></div>

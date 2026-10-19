@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { validSalePrice } from "@/lib/sale-pricing";
+import { isSameOriginMutation } from "@/lib/request-security";
 
 const checkoutSchema = z.object({
   idempotencyKey: z.uuid(),
@@ -15,6 +16,8 @@ const checkoutSchema = z.object({
 }).refine((data) => data.paymentMethod !== "card" || data.cardConfirmed === true, { message: "Confirm the external card payment." });
 
 export async function POST(request: Request) {
+  if (!isSameOriginMutation(request)) return NextResponse.json({ error: "Open POS in Qeilvra to complete this sale." }, { status: 403 });
+  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) return NextResponse.json({ error: "Send the sale as JSON." }, { status: 415 });
   const body = await request.json().catch(() => null);
   const parsed = checkoutSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Check the sale items and payment details." }, { status: 400 });

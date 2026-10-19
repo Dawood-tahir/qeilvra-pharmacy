@@ -31,7 +31,8 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
     ? params.filter!
     : "low_stock";
   const supabase = await createClient();
-  const { data } = await supabase.rpc("inventory_alerts", { p_kind: selected, p_limit: 100 });
+  const { data, error } = await supabase.rpc("inventory_alerts", { p_kind: selected, p_limit: 100 });
+  if (error) throw new Error("Stock alerts could not be loaded. Please try again.");
   const items = (data ?? []) as AlertItem[];
 
   return (

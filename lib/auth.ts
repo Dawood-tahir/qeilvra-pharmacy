@@ -16,17 +16,16 @@ export const getCurrentStaff = cache(async (): Promise<StaffUser | null> => {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return null;
 
-  const [{ data: profile }, { data: role }] = await Promise.all([
-    supabase.from("profiles").select("full_name,is_active").eq("id", user.id).single(),
-    supabase.from("user_roles").select("role").eq("user_id", user.id).single(),
-  ]);
+  const { data: profile } = await supabase.from("profiles").select("full_name,is_active,user_roles!inner(role)").eq("id", user.id).single();
+  const roles = profile?.user_roles as unknown as { role: string }[] | { role: string } | undefined;
+  const role = Array.isArray(roles) ? roles[0]?.role : roles?.role;
 
-  if (!profile?.is_active || !role?.role) return null;
+  if (!profile?.is_active || (role !== "owner" && role !== "salesperson")) return null;
   return {
     id: user.id,
     email: user.email ?? "",
     fullName: profile.full_name,
-    role: role.role as AppRole,
+    role,
   };
 });
 

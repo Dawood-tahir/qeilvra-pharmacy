@@ -1,0 +1,614 @@
+{
+  "date": "2026-10-19",
+  "baselineCommit": "24e8bfd",
+  "database": {
+    "dataset": {
+      "medicines": 10000,
+      "batches": 50000,
+      "sales": 5000,
+      "costAllocations": 5000
+    },
+    "conditions": "Disposable PostgreSQL 18; execution time from EXPLAIN ANALYZE, no network",
+    "before": {
+      "inventory": {
+        "n": 20,
+        "median": 310.316,
+        "p95": 389.801
+      },
+      "medicine_search": {
+        "n": 20,
+        "median": 78.678,
+        "p95": 86.003
+      },
+      "metrics": {
+        "n": 20,
+        "median": 228.4,
+        "p95": 236.028
+      },
+      "trend": {
+        "n": 20,
+        "median": 191.52,
+        "p95": 219.125
+      },
+      "returns": {
+        "n": 20,
+        "median": 36.596,
+        "p95": 75.413
+      }
+    },
+    "after": {
+      "inventory": {
+        "n": 20,
+        "median": 47.625,
+        "p95": 76.116
+      },
+      "medicine_search": {
+        "n": 20,
+        "median": 69.491,
+        "p95": 89.088
+      },
+      "metrics": {
+        "n": 20,
+        "median": 209.962,
+        "p95": 231.011
+      },
+      "trend": {
+        "n": 20,
+        "median": 202.678,
+        "p95": 230.901
+      },
+      "returns": {
+        "n": 20,
+        "median": 36.239,
+        "p95": 42.261
+      }
+    }
+  },
+  "browser": {
+    "before": {
+      "conditions": "Local next start; hosted Supabase read-only business queries; unthrottled desktop Chromium; no field CWV claim",
+      "roles": [
+        {
+          "role": "owner",
+          "api": {
+            "/api/medicines/search?q=para&limit=30": {
+              "n": 20,
+              "median": 1484.5999999996275,
+              "p95": 4856.9000000003725,
+              "status": 200
+            },
+            "/api/returns/invoice": {
+              "n": 20,
+              "median": 1424.300000000745,
+              "p95": 2547.300000000745,
+              "status": 503
+            }
+          },
+          "interaction": {
+            "cart": {
+              "n": 20,
+              "median": 135.19599999999627,
+              "p95": 256.09580000001006
+            },
+            "search": {
+              "n": 20,
+              "median": 456.09639999998035,
+              "p95": 518.2114000000001
+            },
+            "note": "30 synthetic cards, 80ms fixture API delay; actual production React; no checkout performed",
+            "maxObservedEventDuration": null
+          },
+          "pages": [
+            {
+              "path": "/dashboard",
+              "status": 200,
+              "responseEnd": 10265.800000000745,
+              "lcp": 10576,
+              "cls": 0,
+              "encodedJsBytes": 273930
+            },
+            {
+              "path": "/pos",
+              "status": 200,
+              "responseEnd": 1257.5999999996275,
+              "lcp": 1368,
+              "cls": 0,
+              "encodedJsBytes": 211209
+            },
+            {
+              "path": "/medicines",
+              "status": 200,
+              "responseEnd": 2007,
+              "lcp": 2492,
+              "cls": 0,
+              "encodedJsBytes": 164855
+            },
+            {
+              "path": "/purchases",
+              "status": 200,
+              "responseEnd": 2464.699999999255,
+              "lcp": 2640,
+              "cls": 0,
+              "encodedJsBytes": 164855
+            },
+            {
+              "path": "/suppliers",
+              "status": 200,
+              "responseEnd": 1763.1000000014901,
+              "lcp": 1876,
+              "cls": 0,
+              "encodedJsBytes": 165640
+            },
+            {
+              "path": "/returns",
+              "status": 200,
+              "responseEnd": 2692.7000000011176,
+              "lcp": 2856,
+              "cls": 0,
+              "encodedJsBytes": 166923
+            },
+            {
+              "path": "/reports",
+              "failure": "Navigation did not settle within 25s"
+            }
+          ]
+        },
+        {
+          "role": "salesperson",
+          "api": {
+            "/api/medicines/search?q=para&limit=30": {
+              "n": 20,
+              "median": 1426.800000000745,
+              "p95": 3343.5,
+              "status": 200
+            },
+            "/api/returns/invoice": {
+              "n": 20,
+              "median": 1844.0999999996275,
+              "p95": 2449,
+              "status": 503
+            }
+          },
+          "interaction": {
+            "cart": {
+              "n": 20,
+              "median": 157.05830000003334,
+              "p95": 236.36719999997877
+            },
+            "search": {
+              "n": 20,
+              "median": 470.7385999999824,
+              "p95": 503.108899999992
+            },
+            "note": "30 synthetic cards, 80ms fixture API delay; actual production React; no checkout performed",
+            "maxObservedEventDuration": null
+          },
+          "pages": [
+            {
+              "path": "/dashboard",
+              "status": 200,
+              "responseEnd": 9823.599999999627,
+              "lcp": 10172,
+              "cls": 0,
+              "encodedJsBytes": 273930
+            },
+            {
+              "path": "/pos",
+              "failure": "Navigation did not settle within 25s"
+            },
+            {
+              "path": "/medicines",
+              "status": 200,
+              "responseEnd": 1708.4000000003725,
+              "lcp": 1968,
+              "cls": 0,
+              "encodedJsBytes": 164855
+            },
+            {
+              "path": "/returns",
+              "status": 200,
+              "responseEnd": 3655.7999999988824,
+              "lcp": 3844,
+              "cls": 0,
+              "encodedJsBytes": 166923
+            }
+          ]
+        }
+      ]
+    },
+    "after": {
+      "conditions": "Local next start; hosted Supabase read-only business queries; unthrottled desktop Chromium; no field CWV claim",
+      "roles": [
+        {
+          "role": "owner",
+          "api": {
+            "/api/medicines/search?q=para&limit=30": {
+              "n": 20,
+              "median": 898.5,
+              "p95": 1818.5999999996275,
+              "status": 200
+            },
+            "/api/returns/invoice": {
+              "n": 20,
+              "median": 832.8000000007451,
+              "p95": 1941.7999999988824,
+              "status": 503
+            }
+          },
+          "interaction": {
+            "cart": {
+              "n": 20,
+              "median": 171.45840000000317,
+              "p95": 200.98089999999502
+            },
+            "search": {
+              "n": 20,
+              "median": 518.8962999999931,
+              "p95": 547.6094999999914
+            },
+            "note": "30 synthetic cards, 80ms fixture API delay; actual production React; no checkout performed",
+            "maxObservedEventDuration": 152
+          },
+          "pages": [
+            {
+              "path": "/dashboard",
+              "status": 200,
+              "contentReady": true,
+              "responseEnd": 4586.5,
+              "lcp": 4744,
+              "cls": 0,
+              "encodedJsBytes": 276828
+            },
+            {
+              "path": "/pos",
+              "status": 200,
+              "contentReady": true,
+              "responseEnd": 1655.9000000003725,
+              "lcp": 1748,
+              "cls": 0,
+              "encodedJsBytes": 208664
+            },
+            {
+              "path": "/medicines",
+              "status": 200,
+              "contentReady": true,
+              "responseEnd": 1715.7000000011176,
+              "lcp": 1040,
+              "cls": 0,
+              "encodedJsBytes": 165938
+            },
+            {
+              "path": "/purchases",
+              "status": 200,
+              "contentReady": true,
+              "responseEnd": 1185.5,
+              "lcp": 920,
+              "cls": 0,
+              "encodedJsBytes": 165938
+            },
+            {
+              "path": "/suppliers",
+              "status": 200,
+              "contentReady": true,
+              "responseEnd": 1390.800000000745,
+              "lcp": 1552,
+              "cls": 0,
+              "encodedJsBytes": 166723
+            },
+            {
+              "path": "/returns",
+              "status": 200,
+              "contentReady": true,
+              "responseEnd": 2009.800000000745,
+              "lcp": 2388,
+              "cls": 0,
+              "encodedJsBytes": 168214
+            },
+            {
+              "path": "/reports",
+              "status": 200,
+              "contentReady": true,
+              "responseEnd": 2220.2999999988824,
+              "lcp": 2464,
+              "cls": 0,
+              "encodedJsBytes": 273013
+            }
+          ],
+          "security": [
+            {
+              "check": "Cross-origin checkout blocked before transaction",
+              "status": 403
+            }
+          ]
+        },
+        {
+          "role": "salesperson",
+          "api": {
+            "/api/medicines/search?q=para&limit=30": {
+              "n": 20,
+              "median": 1002.4000000003725,
+              "p95": 2470.800000000745,
+              "status": 200
+            },
+            "/api/returns/invoice": {
+              "n": 20,
+              "median": 839.4000000003725,
+              "p95": 1058.199999999255,
+              "status": 503
+            }
+          },
+          "interaction": {
+            "cart": {
+              "n": 20,
+              "median": 188.1005999999761,
+              "p95": 230.23180000000866
+            },
+            "search": {
+              "n": 20,
+              "median": 518.6245000000054,
+              "p95": 548.1167999999889
+            },
+            "note": "30 synthetic cards, 80ms fixture API delay; actual production React; no checkout performed",
+            "maxObservedEventDuration": 168
+          },
+          "pages": [
+            {
+              "path": "/dashboard",
+              "status": 200,
+              "contentReady": true,
+              "responseEnd": 2049.2000000011176,
+              "lcp": 2472,
+              "cls": 0,
+              "encodedJsBytes": 175603
+            },
+            {
+              "path": "/pos",
+              "status": 200,
+              "contentReady": true,
+              "responseEnd": 4227.9000000003725,
+              "lcp": 4416,
+              "cls": 0,
+              "encodedJsBytes": 208664
+            },
+            {
+              "path": "/medicines",
+              "status": 200,
+              "contentReady": true,
+              "responseEnd": 2631.0999999996275,
+              "lcp": 1928,
+              "cls": 0,
+              "encodedJsBytes": 165938
+            },
+            {
+              "path": "/returns",
+              "status": 200,
+              "contentReady": true,
+              "responseEnd": 1460.4000000003725,
+              "lcp": 1512,
+              "cls": 0,
+              "encodedJsBytes": 168214
+            }
+          ],
+          "security": [
+            {
+              "check": "Cross-origin checkout blocked before transaction",
+              "status": 403
+            },
+            {
+              "check": "Direct cost/receiving read medicine_costs",
+              "denied": true
+            },
+            {
+              "check": "Direct cost/receiving read medicine_batches",
+              "denied": true
+            },
+            {
+              "check": "Direct cost/receiving read sale_item_costs",
+              "denied": true
+            },
+            {
+              "check": "Direct cost/receiving read purchases",
+              "denied": true
+            },
+            {
+              "check": "Financial RPC denied",
+              "denied": true
+            },
+            {
+              "check": "Financial export denied",
+              "status": 403
+            },
+            {
+              "check": "Owner page denied /suppliers",
+              "denied": true
+            },
+            {
+              "check": "Owner page denied /purchases",
+              "denied": true
+            },
+            {
+              "check": "Owner page denied /medicines/new",
+              "denied": true
+            },
+            {
+              "check": "Owner page denied /reports",
+              "denied": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "navigation": {
+    "before": {
+      "label": "before",
+      "conditions": "Local production build, hosted read-only business queries, 20 alternating warm navigations per route and role",
+      "roles": [
+        {
+          "role": "owner",
+          "pos": {
+            "n": 20,
+            "median": 3389.7330999999976,
+            "p95": 6578.104300000006
+          },
+          "inventory": {
+            "n": 20,
+            "median": 2190.429600000003,
+            "p95": 3854.248299999992
+          }
+        },
+        {
+          "role": "salesperson",
+          "pos": {
+            "n": 20,
+            "median": 3501.9609000000055,
+            "p95": 6599.406199999998
+          },
+          "inventory": {
+            "n": 20,
+            "median": 2334.3592000000062,
+            "p95": 3342.4002000000037
+          }
+        }
+      ]
+    },
+    "after": {
+      "label": "after",
+      "conditions": "Local production build, hosted read-only business queries, 20 alternating warm navigations per route and role",
+      "roles": [
+        {
+          "role": "owner",
+          "pos": {
+            "n": 20,
+            "median": 2019.314699999988,
+            "p95": 7231.293599999997
+          },
+          "inventory": {
+            "n": 20,
+            "median": 2033.8197999999975,
+            "p95": 5158.9136
+          }
+        },
+        {
+          "role": "salesperson",
+          "pos": {
+            "n": 20,
+            "median": 2412.4915999999794,
+            "p95": 5127.257600000012
+          },
+          "inventory": {
+            "n": 20,
+            "median": 1960.9179000000004,
+            "p95": 5135.949099999998
+          }
+        }
+      ]
+    }
+  },
+  "csvPrefetch": {
+    "before": {
+      "label": "before",
+      "downloadRequestsBeforeClick": [
+        {
+          "type": "sales",
+          "prefetch": "1"
+        },
+        {
+          "type": "inventory",
+          "prefetch": "1"
+        },
+        {
+          "type": "purchases",
+          "prefetch": "1"
+        },
+        {
+          "type": "returns",
+          "prefetch": "1"
+        },
+        {
+          "type": "expenses",
+          "prefetch": "1"
+        },
+        {
+          "type": null,
+          "prefetch": "1"
+        }
+      ],
+      "loaded": false,
+      "timeout": true,
+      "ms": 30008.589799999998
+    },
+    "after": {
+      "label": "after",
+      "downloadRequestsBeforeClick": [],
+      "loaded": true,
+      "rpcChecks": [
+        {
+          "name": "owner_dashboard_metrics",
+          "code": "ok",
+          "ms": 845.5712000000003
+        },
+        {
+          "name": "owner_sales_trend",
+          "code": "ok",
+          "ms": 3134.5173000000013
+        },
+        {
+          "name": "owner_report_breakdowns",
+          "code": "ok",
+          "ms": 2810.556199999999
+        }
+      ],
+      "returnLookupCode": "PGRST202",
+      "cursorChecks": [
+        {
+          "table": "sales",
+          "code": "ok"
+        },
+        {
+          "table": "expenses",
+          "code": "ok"
+        }
+      ],
+      "ms": 4163.594800000001
+    }
+  },
+  "productionDependencies": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  },
+  "publicBundleScan": {
+    "files": 36,
+    "findings": []
+  },
+  "hostedPublicAuth": {
+    "status": 200,
+    "disable_signup": false,
+    "external_email_enabled": true,
+    "mailer_autoconfirm": false
+  },
+  "history": {
+    "scope": "Historical .env.example; credential values are never output",
+    "historicalPrivilegedKeys": 1,
+    "historicalPublicKeys": 0,
+    "matchesCurrentlyConfiguredSecret": false
+  },
+  "verification": {
+    "unitPassed": 123,
+    "unitSkipped": 1,
+    "workflowFullPassed": 398,
+    "workflowFullFailed": 1,
+    "isolatedTabletRefundRerunsPassed": 3,
+    "productionPublicRoutePassed": 14,
+    "credentialDependentE2ESkipped": 14,
+    "inventoryEquivalenceCases": 240,
+    "productionBuild": "passed",
+    "typecheck": "passed",
+    "lint": "passed",
+    "databaseContracts": "passed"
+  }
+}

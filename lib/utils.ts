@@ -8,17 +8,26 @@ export function cn(...inputs: ClassValue[]) {
 export const APP_TIMEZONE = "Asia/Karachi";
 export const APP_CURRENCY = "PKR";
 
+const currencyFormatter = new Intl.NumberFormat("en-PK", {
+  style: "currency", currency: APP_CURRENCY, currencyDisplay: "narrowSymbol", maximumFractionDigits: 2,
+});
+const dateFormatter = new Intl.DateTimeFormat("en-PK", {
+  timeZone: APP_TIMEZONE, day: "2-digit", month: "short", year: "numeric",
+});
+const dateTimeFormatter = new Intl.DateTimeFormat("en-PK", {
+  timeZone: APP_TIMEZONE, day: "2-digit", month: "short", year: "numeric", hour: "numeric", minute: "2-digit",
+});
+const isoFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit",
+});
+
 export function formatCurrency(value: number | string | null | undefined) {
   const numeric = Number(value ?? 0);
-  return new Intl.NumberFormat("en-PK", {
-    style: "currency",
-    currency: APP_CURRENCY,
-    currencyDisplay: "narrowSymbol",
-    maximumFractionDigits: 2,
-  }).format(Number.isFinite(numeric) ? numeric : 0).replace("PKR", "Rs.");
+  return currencyFormatter.format(Number.isFinite(numeric) ? numeric : 0).replace("PKR", "Rs.");
 }
 
 export function formatDate(value: string | Date, options?: Intl.DateTimeFormatOptions) {
+  if (!options) return dateFormatter.format(new Date(value));
   return new Intl.DateTimeFormat("en-PK", {
     timeZone: APP_TIMEZONE,
     day: "2-digit",
@@ -29,22 +38,11 @@ export function formatDate(value: string | Date, options?: Intl.DateTimeFormatOp
 }
 
 export function formatDateTime(value: string | Date) {
-  return formatDate(value, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return dateTimeFormatter.format(new Date(value));
 }
 
 export function localDateISO(date = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: APP_TIMEZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  return isoFormatter.format(date);
 }
 
 export function getInitials(name: string) {

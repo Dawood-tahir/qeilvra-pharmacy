@@ -62,3 +62,4 @@ button, a { -webkit-tap-highlight-color: transparent; }
   50% { opacity: 1; }
 }
 .skeleton { animation: q-pulse 1.5s ease-in-out infinite; background: #e2e8f0; }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }

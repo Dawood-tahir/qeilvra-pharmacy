@@ -29,6 +29,7 @@ export function ReturnLookup({ staffId, initialSaleId, onClose, onReturned }: { 
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
       const parsed = returnSaleSchema.array().safeParse(data.sales);
       if (!parsed.success) throw new Error("Sales could not be loaded. Please refresh and try again.");
+      if (request.signal.aborted) return;
       const sales = parsed.data; setInvoices(sales); setHasMore(Boolean(data.hasMore));
       if (saleId && sales[0]) setInvoice(sales[0]);
     } catch (e) { if (!request.signal.aborted) setError(e instanceof Error ? e.message : "Could not load recent sales."); }

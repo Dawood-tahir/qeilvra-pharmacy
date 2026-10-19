@@ -3,16 +3,13 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { safeAppPath } from "@/lib/navigation";
 
 const loginSchema = z.object({
   email: z.email().max(254),
   password: z.string().min(1).max(200),
   next: z.string().optional(),
 });
-
-function safeNext(value?: string) {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
-}
 
 export async function loginAction(formData: FormData) {
   const parsed = loginSchema.safeParse(Object.fromEntries(formData));
@@ -30,7 +27,7 @@ export async function loginAction(formData: FormData) {
     await supabase.auth.signOut();
     redirect("/login?error=inactive");
   }
-  redirect(safeNext(parsed.data.next));
+  redirect(safeAppPath(parsed.data.next));
 }
 
 export async function forgotPasswordAction(formData: FormData) {

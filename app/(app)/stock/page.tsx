@@ -8,23 +8,26 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { requireOwner } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate, localDateISO } from "@/lib/utils";
+import { pageNumber } from "@/lib/pagination";
 
 export default async function StockPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; medicine?: string }> }) {
   await requireOwner();
   const params = await searchParams;
   const query = (params.q ?? "").slice(0, 100);
-  const page = Math.max(Number(params.page) || 1, 1);
+  const page = pageNumber(params.page);
   const pageSize = 30;
   const supabase = await createClient();
   let request = supabase.from("medicine_batches").select("id,batch_number,expiry_date,quantity_on_hand,purchase_cost,is_quarantined,medicines!inner(id,name,strength,sku,base_unit),suppliers(name)", { count: "exact" }).order("expiry_date").range((page - 1) * pageSize, page * pageSize - 1);
   if (params.medicine) request = request.eq("medicine_id", params.medicine);
   if (query) {
     const safeQuery = query.replace(/[,%()]/g, " ");
-    const { data: matchingMedicines } = await supabase.from("medicines").select("id").or(`name.ilike.%${safeQuery}%,generic_name.ilike.%${safeQuery}%,sku.ilike.%${safeQuery}%`).limit(100);
+    const { data: matchingMedicines, error: searchError } = await supabase.from("medicines").select("id").or(`name.ilike.%${safeQuery}%,generic_name.ilike.%${safeQuery}%,sku.ilike.%${safeQuery}%`).limit(100);
+    if (searchError) throw new Error("Medicine search could not be loaded. Please try again.");
     const medicineIds = (matchingMedicines ?? []).map((item) => item.id);
     request = request.or([`batch_number.ilike.%${safeQuery}%`, ...(medicineIds.length ? [`medicine_id.in.(${medicineIds.join(",")})`] : [])].join(","));
   }
-  const { data, count } = await request;
+  const { data, count, error } = await request;
+  if (error) throw new Error("Stock batches could not be loaded. Please try again.");
   const batches = data ?? [];
   const today = localDateISO();
   const pageHref = (next: number) => `/stock?${new URLSearchParams({ ...(query ? { q: query } : {}), ...(params.medicine ? { medicine: params.medicine } : {}), page: String(next) })}`;

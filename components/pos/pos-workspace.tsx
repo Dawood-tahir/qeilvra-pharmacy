@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
@@ -11,11 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { cn, formatCurrency } from "@/lib/utils";
 import { cartBaseQuantity, pluralUnit, toMinor, type StockMedicine, type SellingUnit } from "@/lib/medicine-units";
-import { PriceEditor } from "@/components/pos/price-editor";
-import { ReturnLookup } from "@/components/pos/return-lookup";
+import { DialogLoading } from "@/components/ui/dialog-loading";
 import type { AppRole } from "@/lib/auth";
 
 type CartItem = StockMedicine & { quantity: number; unit: SellingUnit; lineKey: string; customPrice?: number };
+const PriceEditor = lazy(() => import("@/components/pos/price-editor").then(module => ({ default: module.PriceEditor })));
+const ReturnLookup = lazy(() => import("@/components/pos/return-lookup").then(module => ({ default: module.ReturnLookup })));
 type SaleResult = { sale_id: string; invoice_number: string; net_total: number; change_amount: number };
 type CheckoutRequest = { idempotencyKey: string; items: { medicineId: string; unitKey: string; quantity: number; expectedPrice: string; customPrice?: string }[]; paymentMethod: "cash" | "card"; tenderedAmount: number | null; discount: number; cardConfirmed?: boolean };
 const cartSchema = z.array(z.object({
@@ -82,8 +83,9 @@ export function PosWorkspace({ role, staffId = "local" }: { role: AppRole; staff
       try {
         const response = await fetch("/api/medicines/search?q=" + encodeURIComponent(query.trim()) + "&limit=30", { signal: controller.signal, cache: "no-store" });
         if (!response.ok) throw new Error();
-        setMedicines(await response.json());
-      } catch { if (!controller.signal.aborted) setSearchError("Could not load medicines. Check your connection and try again."); }
+        const data = await response.json();
+        if (!controller.signal.aborted) setMedicines(data);
+      } catch { if (!controller.signal.aborted) { setMedicines([]); setSearchError("Could not load medicines. Check your connection and try again."); } }
       finally { if (!controller.signal.aborted) setLoading(false); }
     }, query ? 220 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
@@ -163,7 +165,7 @@ export function PosWorkspace({ role, staffId = "local" }: { role: AppRole; staff
       {request && <div role="alert" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Sale status is unconfirmed. Retry safely before changing the cart.<Button className="mt-2 w-full" onClick={() => setPaymentOpen(true)}>Retry Sale</Button></div>}
       {searchError && <div role="alert" className="mt-3 text-sm text-red-700">{searchError}<Button variant="ghost" onClick={() => setSearchVersion((n) => n + 1)}>Try again</Button></div>}
       <div id="pos-medicines" aria-busy={loading} className="scrollbar-thin mt-4 grid flex-1 auto-rows-min grid-cols-1 gap-2 overflow-y-auto pb-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3">
-        {loading && !medicines.length && <p role="status">Finding medicines...</p>}
+        {loading && !medicines.length && <><p role="status" className="col-span-full text-sm text-slate-500">Finding medicines...</p>{[0,1,2,3,4,5].map(index => <div key={index} aria-hidden="true" className={cn("rounded-xl border border-slate-200 bg-white p-3", index > 1 && "hidden sm:block")}><div className="skeleton h-4 w-2/3 rounded" /><div className="skeleton mt-2 h-3 w-1/2 rounded" /><div className="skeleton mt-5 h-11 rounded-lg" /><div className="skeleton mt-3 h-8 rounded-lg" /><div className="skeleton mt-3 h-11 rounded-lg" /></div>)}</>}
         {!loading && !searchError && !medicines.length && <p className="col-span-full rounded-xl bg-white p-6 text-sm text-slate-500">No medicines found. Try another name or barcode.</p>}
         {medicines.map((m) => <MedicineCard key={m.id} medicine={m} preferred={preferredUnits[m.id]} inCart={cartBaseQuantity(cart, m.id)} locked={Boolean(request) || processing} prices={prices} onPrice={(unit) => setEditing({ medicine: m, unit })} onAdd={(u, q) => add(m, u, q)} />)}
       </div>
@@ -172,8 +174,12 @@ export function PosWorkspace({ role, staffId = "local" }: { role: AppRole; staff
     <div className="fixed inset-x-0 bottom-[calc(69px+env(safe-area-inset-bottom))] z-40 border-t border-slate-200 bg-white p-3 lg:hidden"><Button size="lg" className="w-full justify-between" onClick={() => setCartOpen(true)}><span className="flex items-center gap-2"><ShoppingCart />{cart.length ? "Cart & Checkout" : "View cart"}</span><strong>{formatCurrency(total)}</strong></Button></div>
     {cartOpen && <Dialog label="Current sale" fallbackFocus={searchRef} fullScreen onClose={() => setCartOpen(false)}><div className="flex h-full flex-col"><div className="flex items-center justify-between border-b p-3"><h2 className="font-bold">Current sale</h2><Button variant="ghost" aria-label="Close cart" size="icon" onClick={() => setCartOpen(false)}><X /></Button></div>{panel}</div></Dialog>}
     {paymentOpen && <Dialog label="Complete sale" fallbackFocus={searchRef} busy={processing} onClose={() => setPaymentOpen(false)}><div className="flex items-center justify-between"><h2 className="text-xl font-extrabold">{request ? "Confirm sale status" : "Complete sale"}</h2><Button variant="ghost" size="icon" aria-label="Close payment" disabled={processing} onClick={() => setPaymentOpen(false)}><X /></Button></div><div className="mt-5 rounded-xl bg-slate-950 p-5 text-white"><p className="text-sm text-slate-300">Total amount</p><p className="mt-1 text-3xl font-extrabold">{formatCurrency(request ? request.items.reduce((s, l) => s + toMinor(l.customPrice ?? l.expectedPrice) * l.quantity, 0) / 100 - request.discount : total)}</p></div>{!request && <><fieldset className="mt-4 flex gap-2" disabled={processing}><legend className="mb-2 text-sm font-bold">Payment method</legend>{(["cash", "card"] as const).map((value) => <Button key={value} variant={method === value ? "default" : "outline"} className="h-12 flex-1 capitalize" aria-pressed={method === value} onClick={() => { setMethod(value); setCardConfirmed(false); }}>{value}</Button>)}</fieldset>{method === "cash" && <label className="mt-4 block"><span className="mb-2 block text-sm font-bold">Cash received (Rs.)</span><Input autoFocus inputMode="decimal" value={tendered} disabled={processing} onChange={(e) => setTendered(e.target.value)} /><Button className="mt-2" variant="secondary" disabled={processing} onClick={() => setTendered(total.toFixed(2))}>Exact amount</Button><p className="mt-3 text-sm">Change: <strong>{formatCurrency(change)}</strong></p></label>}{method === "card" && <label className="mt-4 flex items-center gap-3 rounded-xl bg-blue-50 p-3 text-sm"><input type="checkbox" className="size-5 shrink-0" checked={cardConfirmed} disabled={processing} onChange={(e) => setCardConfirmed(e.target.checked)} />Payment confirmed on the external card machine</label>}</>}<Button size="lg" className="mt-5 w-full" onClick={checkout} disabled={processing || !cart.length || (!request && method === "card" && !cardConfirmed) || (!request && method === "cash" && toMinor(tendered) < subtotalMinor - discountMinor)}>{processing ? <><LoaderCircle className="animate-spin" /> Completing sale...</> : request ? "Retry Sale" : "Complete Sale"}</Button></Dialog>}
-    {editing && <PriceEditor name={editing.medicine.name + " " + (editing.medicine.strength ?? "")} unit={editing.unit} price={prices[editing.medicine.id + ":" + editing.unit.unit_key] ?? cart.find((line) => line.lineKey === editing.medicine.id + ":" + editing.unit.unit_key)?.customPrice ?? Number(editing.unit.selling_price)} role={role} onSave={changePrice} onClose={() => setEditing(null)} />}
-    {returnOpen && <ReturnLookup staffId={staffId} onReturned={() => setSearchVersion((version) => version + 1)} onClose={() => setReturnOpen(false)} />}
+    {editing && <Suspense fallback={<DialogLoading label="Change price" onClose={() => setEditing(null)} />}>
+      <PriceEditor name={editing.medicine.name + " " + (editing.medicine.strength ?? "")} unit={editing.unit} price={prices[editing.medicine.id + ":" + editing.unit.unit_key] ?? cart.find((line) => line.lineKey === editing.medicine.id + ":" + editing.unit.unit_key)?.customPrice ?? Number(editing.unit.selling_price)} role={role} onSave={changePrice} onClose={() => setEditing(null)} />
+    </Suspense>}
+    {returnOpen && <Suspense fallback={<DialogLoading label="Return / Refund" onClose={() => setReturnOpen(false)} />}>
+      <ReturnLookup staffId={staffId} onReturned={() => setSearchVersion((version) => version + 1)} onClose={() => setReturnOpen(false)} />
+    </Suspense>}
   </main>;
 }
 

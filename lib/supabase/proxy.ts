@@ -31,22 +31,33 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // Verified JWTs use the SDK's public-key cache when asymmetric signing is enabled.
+  // Each protected action/page still checks the user and current database permissions.
+  const { data, error } = await supabase.auth.getClaims();
+  const user = !error && data?.claims.sub;
+  const finish = (next: NextResponse) => {
+    response.cookies.getAll().forEach(cookie => next.cookies.set(cookie));
+    next.headers.set("Cache-Control", "private, no-store");
+    return next;
+  };
+  response.headers.set("Cache-Control", "private, no-store");
   const path = request.nextUrl.pathname;
   const isAuthPath = path.startsWith("/login") || path.startsWith("/forgot-password") || path.startsWith("/auth/");
 
   if (!user && !isAuthPath && !path.startsWith("/_next") && path !== "/favicon.ico") {
-    if (path.startsWith("/api/")) return NextResponse.json({ error: "Your session expired. Sign in again." }, { status: 401 });
+    if (path.startsWith("/api/")) return finish(NextResponse.json({ error: "Your session expired. Sign in again." }, { status: 401 }));
     const urlTo = request.nextUrl.clone();
     urlTo.pathname = "/login";
     urlTo.searchParams.set("next", path);
-    return NextResponse.redirect(urlTo);
+    return finish(NextResponse.redirect(urlTo));
   }
-  if (user && path === "/login") {
+  // An inactive profile can still have a valid Auth token. Let its sign-in error
+  // render instead of bouncing forever between Dashboard and Login.
+  if (user && path === "/login" && request.nextUrl.searchParams.get("error") !== "inactive") {
     const urlTo = request.nextUrl.clone();
     urlTo.pathname = "/dashboard";
     urlTo.search = "";
-    return NextResponse.redirect(urlTo);
+    return finish(NextResponse.redirect(urlTo));
   }
   return response;
 }

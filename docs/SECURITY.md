@@ -14,7 +14,7 @@ The salesperson-readable `medicines` and `sale_items` tables contain no purchase
 
 `checkout_sale` locks all eligible batch rows in a deterministic medicine order, validates stock and server-side prices, consumes FEFO batches, inserts the sale/items/cost allocations/payment/movements/audit entry, and returns one result. Any exception rolls back the whole function.
 
-`post_purchase`, `adjust_stock`, and `review_sale_return` use the same all-or-nothing database boundary. Historical sales are not updated or deleted to simulate returns.
+`post_purchase`, `adjust_stock`, and `complete_sale_return` use the same all-or-nothing database boundary. Active Owners and Salespeople complete authorized POS returns immediately. Historical sales are not deleted to simulate returns; the Owner-only review RPC remains for historical requests.
 
 ## Service key use
 
@@ -28,3 +28,13 @@ The service key is required only for the one-time Owner bootstrap and Owner-auth
 - Back up before migrations.
 - Review `audit_logs` for medicine price, role, expense, settings, stock, checkout, and refund events.
 - Test policies with actual Salesperson JWTs after every schema change.
+
+## 19 October 2026 audit
+
+The Proxy verifies JWT signatures through `getClaims`; protected server operations retain fresh `getUser` checks. Staff/role reads share one request-scoped client and one joined query. No account data or stock authorization is cached across requests.
+
+Migration `202610190010` makes staff checks fail closed for inactive or unassigned Auth identities and restricts inactive refund-history reads. Migration `202610190011` adds measured query improvements and an Owner-only expense-total RPC. These migrations are prepared and tested locally; production application requires approval.
+
+The hosted public Auth settings returned `disable_signup: false` during this audit. The local `enable_signup = false` configuration does not establish hosted configuration. Disable hosted public signup after approval; the Settings screen no longer claims it is already disabled. A privileged key also remains in Git history; its revocation has not been confirmed. Rotating only the currently configured replacement key would not necessarily revoke that historical credential.
+
+See [the audit report](PERFORMANCE-SECURITY-AUDIT.md) for measurements, findings, test scope, and deployment requirements. This is not an ASVS certification or a guarantee that the hosted system is fully secure.

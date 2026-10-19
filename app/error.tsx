@@ -5,7 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  useEffect(() => { console.error(error); }, [error]);
+  useEffect(() => { if (error.digest) console.error("Qeilvra error reference:", error.digest); }, [error.digest]);
   return (
     <main className="grid min-h-screen place-items-center p-6">
       <div className="max-w-md text-center">

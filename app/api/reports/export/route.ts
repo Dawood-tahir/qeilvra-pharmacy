@@ -1,42 +1,58 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { csvRow } from "@/lib/csv";
 
-const schema = z.object({ type: z.enum(["sales", "purchases", "expenses", "inventory", "returns"]), from: z.iso.date(), to: z.iso.date() });
-
-function csvCell(value: unknown) {
-  let text = value == null ? "" : String(value);
-  if (/^[=+\-@]/.test(text)) text = `'${text}`;
-  return `"${text.replaceAll('"', '""')}"`;
-}
-function toCsv(headers: string[], rows: unknown[][]) { return [headers.map(csvCell).join(","), ...rows.map((row) => row.map(csvCell).join(","))].join("\r\n"); }
+const schema = z.object({ type: z.enum(["sales", "purchases", "expenses", "inventory", "returns"]), from: z.iso.date(), to: z.iso.date() }).refine(value => value.from <= value.to);
+type Row = Record<string, unknown>;
+const nested = (row: Row, key: string, field: string) => (row[key] as Row | null)?.[field];
+const exportConfig = {
+  sales: { table: "sales", fields: "id,invoice_number,completed_at,subtotal,discount,net_total,status,profiles!sales_created_by_fkey(full_name)", date: "completed_at", timestamp: true, headers: ["Invoice", "Completed At", "Subtotal", "Discount", "Net Revenue", "Status", "Salesperson"], cells: (r: Row) => [r.invoice_number,r.completed_at,r.subtotal,r.discount,r.net_total,r.status,nested(r,"profiles","full_name")] },
+  purchases: { table: "purchases", fields: "id,purchase_number,invoice_date,status,subtotal,discount,total,suppliers(name)", date: "invoice_date", timestamp: false, headers: ["Purchase", "Invoice Date", "Supplier", "Status", "Subtotal", "Discount", "Total"], cells: (r: Row) => [r.purchase_number,r.invoice_date,nested(r,"suppliers","name"),r.status,r.subtotal,r.discount,r.total] },
+  expenses: { table: "expenses", fields: "id,expense_date,description,payee,amount,payment_method,expense_categories(name)", date: "expense_date", timestamp: false, headers: ["Date", "Category", "Description", "Payee", "Amount", "Payment Method"], cells: (r: Row) => [r.expense_date,nested(r,"expense_categories","name"),r.description,r.payee,r.amount,r.payment_method] },
+  returns: { table: "sale_returns", fields: "id,return_number,requested_at,status,reason,refund_amount,sales(invoice_number)", date: "requested_at", timestamp: true, headers: ["Return", "Sale Invoice", "Requested At", "Status", "Reason", "Refund Amount"], cells: (r: Row) => [r.return_number,nested(r,"sales","invoice_number"),r.requested_at,r.status,r.reason,r.refund_amount] },
+  inventory: { table: "medicine_batches", fields: "id,batch_number,expiry_date,quantity_on_hand,purchase_cost,is_quarantined,medicines(name,sku),suppliers(name)", date: "expiry_date", timestamp: false, headers: ["Medicine", "SKU", "Batch", "Expiry", "Quantity", "Unit Cost", "Supplier", "Quarantined"], cells: (r: Row) => [nested(r,"medicines","name"),nested(r,"medicines","sku"),r.batch_number,r.expiry_date,r.quantity_on_hand,r.purchase_cost,nested(r,"suppliers","name"),r.is_quarantined] },
+};
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const parsed = schema.safeParse(Object.fromEntries(url.searchParams));
+  const parsed = schema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
   if (!parsed.success) return NextResponse.json({ error: "Invalid report request." }, { status: 400 });
+  const { type, from, to } = parsed.data;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { data: role } = await supabase.rpc("current_role");
-  if (role !== "owner") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  let csv = "";
-  if (parsed.data.type === "sales") {
-    const fromTime = `${parsed.data.from}T00:00:00+05:00`; const toTime = `${parsed.data.to}T23:59:59.999+05:00`;
-    const { data } = await supabase.from("sales").select("invoice_number,completed_at,subtotal,discount,net_total,status,profiles!sales_created_by_fkey(full_name)").gte("completed_at", fromTime).lte("completed_at", toTime).order("completed_at");
-    csv = toCsv(["Invoice", "Completed At", "Subtotal", "Discount", "Net Revenue", "Status", "Salesperson"], (data ?? []).map((r) => [r.invoice_number, r.completed_at, r.subtotal, r.discount, r.net_total, r.status, (r.profiles as unknown as { full_name?: string })?.full_name]));
-  } else if (parsed.data.type === "purchases") {
-    const { data } = await supabase.from("purchases").select("purchase_number,invoice_date,status,subtotal,discount,total,suppliers(name)").gte("invoice_date", parsed.data.from).lte("invoice_date", parsed.data.to).order("invoice_date");
-    csv = toCsv(["Purchase", "Invoice Date", "Supplier", "Status", "Subtotal", "Discount", "Total"], (data ?? []).map((r) => [r.purchase_number, r.invoice_date, (r.suppliers as unknown as { name?: string })?.name, r.status, r.subtotal, r.discount, r.total]));
-  } else if (parsed.data.type === "expenses") {
-    const { data } = await supabase.from("expenses").select("expense_date,description,payee,amount,payment_method,expense_categories(name)").gte("expense_date", parsed.data.from).lte("expense_date", parsed.data.to).order("expense_date");
-    csv = toCsv(["Date", "Category", "Description", "Payee", "Amount", "Payment Method"], (data ?? []).map((r) => [r.expense_date, (r.expense_categories as unknown as { name?: string })?.name, r.description, r.payee, r.amount, r.payment_method]));
-  } else if (parsed.data.type === "returns") {
-    const { data } = await supabase.from("sale_returns").select("return_number,requested_at,status,reason,refund_amount,sales(invoice_number)").gte("requested_at", `${parsed.data.from}T00:00:00+05:00`).lte("requested_at", `${parsed.data.to}T23:59:59.999+05:00`).order("requested_at");
-    csv = toCsv(["Return", "Sale Invoice", "Requested At", "Status", "Reason", "Refund Amount"], (data ?? []).map((r) => [r.return_number, (r.sales as unknown as { invoice_number?: string })?.invoice_number, r.requested_at, r.status, r.reason, r.refund_amount]));
-  } else {
-    const { data } = await supabase.from("medicine_batches").select("batch_number,expiry_date,quantity_on_hand,purchase_cost,is_quarantined,medicines(name,sku),suppliers(name)").order("expiry_date");
-    csv = toCsv(["Medicine", "SKU", "Batch", "Expiry", "Quantity", "Unit Cost", "Supplier", "Quarantined"], (data ?? []).map((r) => [ (r.medicines as unknown as { name?: string })?.name, (r.medicines as unknown as { sku?: string })?.sku, r.batch_number, r.expiry_date, r.quantity_on_hand, r.purchase_cost, (r.suppliers as unknown as { name?: string })?.name, r.is_quarantined ]));
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { data: role, error: roleError } = await supabase.rpc("current_role");
+  if (roleError || role !== "owner") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const config = exportConfig[type];
+  async function page(after?: { date: string; id: string }) {
+    let query = supabase.from(config.table).select(config.fields, after ? undefined : { count: "exact" });
+    if (type !== "inventory") query = query.gte(config.date, from + (config.timestamp ? "T00:00:00+05:00" : "")).lte(config.date, to + (config.timestamp ? "T23:59:59.999999+05:00" : ""));
+    // Seek from the last saved date/id. Offset paging can repeat invoices when
+    // another cashier/Owner inserts a backdated record during a long export.
+    if (after) query = query.or(`${config.date}.gt.${after.date},and(${config.date}.eq.${after.date},id.gt.${after.id})`);
+    const result = await query.order(config.date).order("id").range(0, 499);
+    if (result.error) throw new Error("Export could not load. Please retry.");
+    return { rows: (result.data ?? []) as unknown as Row[], count: result.count };
   }
-  return new NextResponse(`\uFEFF${csv}`, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="qeilvra-${parsed.data.type}-${parsed.data.from}-to-${parsed.data.to}.csv"`, "Cache-Control": "private, no-store" } });
+  let first;
+  try { first = await page(); }
+  catch { return NextResponse.json({ error: "Export could not load. Please retry." }, { status: 503 }); }
+  if (first.count == null) return NextResponse.json({ error: "Export completeness could not be verified. Please retry." }, { status: 503 });
+  const total = first.count;
+  let batch = first.rows, sent = 0, heading = true;
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        if (heading) { controller.enqueue(encoder.encode("\uFEFF" + csvRow(config.headers))); heading = false; }
+        if (!batch.length && sent < total) throw new Error("Export interrupted. Retry the download.");
+        if (batch.length) { controller.enqueue(encoder.encode(batch.map(row => csvRow(config.cells(row))).join(""))); sent += batch.length; }
+        if (sent >= total) { controller.close(); return; }
+        const last = batch.at(-1);
+        if (!last || typeof last[config.date] !== "string" || typeof last.id !== "string") throw new Error("Export cursor unavailable.");
+        batch = (await page({ date: last[config.date] as string, id: last.id })).rows;
+      } catch { controller.error(new Error("Export interrupted. Retry the download.")); }
+    },
+  });
+  return new NextResponse(stream, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="qeilvra-${type}-${from}-to-${to}.csv"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
 }
