@@ -71,7 +71,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
   }, [router]);
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
+    <div className="min-h-screen lg:grid lg:grid-cols-[260px_minmax(0,1fr)] print:block print:min-h-0">
       <aside className="no-print fixed inset-y-0 left-0 z-40 hidden w-[260px] flex-col overflow-hidden bg-[linear-gradient(160deg,#071b45_0%,#0b4380_72%,#0c617a_120%)] text-white shadow-xl lg:flex">
         <div className="p-6"><BrandMark light /></div>
         <nav className="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-3 py-2" aria-label="Primary navigation">

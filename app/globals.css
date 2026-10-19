@@ -30,9 +30,22 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 @media print {
   .no-print { display: none !important; }
+  html { background: white !important; }
   body { background: white !important; color: black; }
   @page { margin: 7mm; }
+  body:has([data-paper]) { min-height: 0; }
+  body:has([data-paper]) main { margin: 0 !important; padding: 0 !important; }
+  [data-paper] { width: 100% !important; color: #000; }
+  [data-paper] tr { break-inside: avoid; }
+  [data-paper="58mm"] { max-width: 54mm !important; }
+  [data-paper="80mm"] { max-width: 76mm !important; }
 }
+
+[data-paper] table { table-layout: fixed; font-size: 10px; }
+[data-paper] table td, [data-paper] table th { padding: 6px 2px; overflow-wrap: anywhere; }
+[data-paper] article { overflow-wrap: anywhere; }
+@page thermal { margin: 2mm; }
+[data-paper] { page: thermal; }
 
 .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
 .safe-bottom { padding-bottom: calc(.75rem + env(safe-area-inset-bottom)); }

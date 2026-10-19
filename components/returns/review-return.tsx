@@ -11,7 +11,7 @@ import { formatCurrency } from "@/lib/utils";
 
 type Item = { id: string; quantity: number; medicine: string };
 
-export function ReviewReturn({ returnId, invoiceNumber, items }: { returnId: string; invoiceNumber?: string; items: Item[] }) {
+export function ReviewReturn({ returnId, invoiceNumber, items, onReviewed }: { returnId: string; invoiceNumber?: string; items: Item[]; onReviewed?: () => void }) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [values, setValues] = useState(() => Object.fromEntries(items.map((item) => [item.id, { quantity: item.quantity, restockable: false }])));
@@ -25,7 +25,7 @@ export function ReviewReturn({ returnId, invoiceNumber, items }: { returnId: str
       try {
         const result = await reviewReturnAction({ returnId, approve, notes, paymentMethod: "cash", items: approve ? items.map((item) => ({ return_item_id: item.id, approved_quantity: values[item.id]?.quantity ?? 0, restockable: values[item.id]?.restockable ?? false })) : [] });
         if (!result.ok) { setError(result.error); return; }
-        toast.success(approve ? "Return approved. Cash refund recorded: " + formatCurrency(result.refund) : "Return rejected."); setOpen(false);
+        toast.success(approve ? "Return approved. Cash refund recorded: " + formatCurrency(result.refund) : "Return rejected."); setOpen(false); onReviewed?.();
       } catch { setError("Could not confirm the decision. Check Returns for its current status before trying again."); }
       finally { busy.current = false; }
     });

@@ -78,7 +78,7 @@ test("mixed-unit POS totals and cart survive refresh",async({page})=>{
  await dialog.getByRole("button",{name:"Complete Sale",exact:true}).click();
  await expect(page.getByRole("heading",{name:"QEI-TEST"})).toBeVisible();
  expect(payload?.items).toEqual([{medicineId:medicine.id,unitKey:"base",quantity:1,expectedPrice:"7.00"},{medicineId:medicine.id,unitKey:"strip",quantity:1,expectedPrice:"65.00"},{medicineId:medicine.id,unitKey:"box",quantity:1,expectedPrice:"620.00"}]);
- await expect(page.getByRole("link",{name:"Print receipt"})).toHaveAttribute("href","/sales/sale?print=thermal");
+ await expect(page.getByRole("link",{name:"Print receipt"})).toHaveAttribute("href","/sales/sale?print=thermal&width=80");
 });
 test("lost checkout response retries the exact request",async({page})=>{
  await search(page);let first:unknown;let attempts=0;

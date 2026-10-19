@@ -49,5 +49,5 @@ switch (flow) {
   case "stock": screen = await StockPage({ searchParams }); break;
   default: screen = <main className="mx-auto max-w-3xl p-4"><h1 className="mb-4 text-2xl font-extrabold">{flow === "restock" ? "Add More Stock" : "Add New Medicine"}</h1><div className="rounded-2xl border border-slate-200 bg-white p-4">{flow === "restock" ? <RestockForm suppliers={params.get("suppliers") === "none" ? [] : suppliers} /> : <MedicineForm />}</div></main>;
 }
-const content = params.has("shell") ? <AppShell staff={{ id: "fixture", fullName: "Test " + role, email: "fixture@example.test", role }}>{screen}</AppShell> : <><div className="border-b bg-[#071b45] p-4 font-bold text-white">Qeilvra <span className="text-xs font-normal text-blue-200">workflow test fixture</span></div>{screen}</>;
+const content = params.has("shell") ? <AppShell staff={{ id: "fixture", fullName: "Test " + role, email: "fixture@example.test", role }}>{screen}</AppShell> : <><div className="no-print border-b bg-[#071b45] p-4 font-bold text-white">Qeilvra <span className="text-xs font-normal text-blue-200">workflow test fixture</span></div>{screen}</>;
 createRoot(document.getElementById("root")!).render(<>{content}<Toaster /></>);
