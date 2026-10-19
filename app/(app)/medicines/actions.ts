@@ -13,6 +13,7 @@ function safeError(message: string, code?: string) {
   return /^(Enter |Choose |Confirm |The Owner |Existing fractional|Packaging is fixed|This medicine|This selling|Check |Selling price|Stock must)/.test(message) ? message : "Could not save. Your entries are kept. Check your connection and try again.";
 }
 function refreshInventory() {
+  revalidatePath("/suppliers/[id]", "page");
   for (const path of ["/medicines", "/stock", "/purchases", "/dashboard", "/pos"]) revalidatePath(path);
 }
 export async function saveGuidedMedicineAction(id: string | null, input: unknown, stock: unknown, requestKey: string) {

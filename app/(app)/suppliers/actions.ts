@@ -30,6 +30,7 @@ export async function setSupplierActiveAction(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("suppliers").update({ is_active: parsed.data.active === "true" }).eq("id", parsed.data.id);
   if (error) return { ok: false, error: "Supplier status could not be changed. Please try again." };
+  revalidatePath(`/suppliers/${parsed.data.id}`);
   revalidatePath("/suppliers"); revalidatePath("/medicines/restock"); revalidatePath("/purchases/new");
   return { ok: true, message: parsed.data.active === "true" ? "Supplier reactivated." : "Supplier deactivated. Previous purchases are kept." };
 }

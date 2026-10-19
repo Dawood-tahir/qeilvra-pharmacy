@@ -1,22 +1,41 @@
-import { medicine, metrics, tables } from "./data";
+import { medicine, metrics, purchase, tables } from "./data";
 import { localDateISO } from "@/lib/utils";
+import { supplierFixtureTables } from "./supplier-data";
 
 class FixtureQuery {
   rows: Record<string, unknown>[];
   one = false;
-  constructor(table: string) { this.rows = [...(tables[table] ?? [])]; }
+  start = 0;
+  end = Infinity;
+  orders: { key: string; ascending: boolean }[] = [];
+  constructor(table: string) {
+    const profile = location.pathname.startsWith("/suppliers/") || (location.pathname.startsWith("/purchases/") && ![purchase.id, "new"].includes(location.pathname.split("/").at(-1)!));
+    this.rows = [...((profile ? supplierFixtureTables() : tables)[table] ?? [])];
+  }
+  value(row: Record<string, unknown>, key: string): unknown { return key.replace(/\((\w+)\)/, ".$1").split(".").reduce<unknown>((value, part) => (value as Record<string, unknown> | undefined)?.[part], row); }
   select() { return this; }
-  eq(key: string, value: unknown) { if (!key.includes(".")) this.rows = this.rows.filter((row) => row[key] === value); return this; }
+  eq(key: string, value: unknown) { this.rows = this.rows.filter((row) => this.value(row, key) === value); return this; }
+  in(key: string, values: unknown[]) { this.rows = this.rows.filter((row) => values.includes(this.value(row, key))); return this; }
+  gt(key: string, value: number) { this.rows = this.rows.filter((row) => Number(this.value(row, key)) > value); return this; }
   ilike(key: string, value: string) { this.rows = this.rows.filter((row) => String(row[key]).toLowerCase().includes(value.replaceAll("%", "").toLowerCase())); return this; }
-  gte() { return this; }
+  gte(key: string, value: string) { this.rows = this.rows.filter((row) => String(this.value(row, key)) >= value); return this; }
   lte() { return this; }
-  order() { return this; }
-  limit() { return this; }
-  range() { return this; }
-  or() { return this; }
+  order(key: string, options?: { ascending?: boolean }) { this.orders.push({ key, ascending: options?.ascending !== false }); return this; }
+  limit(limit: number) { this.end = limit - 1; return this; }
+  range(start: number, end: number) { this.start = start; this.end = end; return this; }
+  or(filter: string, options?: { referencedTable?: string }) {
+    this.rows = this.rows.filter((row) => filter.split(",").some((part) => {
+      const [key, , pattern] = part.split(".");
+      const value = String(this.value(row, options?.referencedTable ? options.referencedTable + "." + key : key) ?? "").toLowerCase();
+      return (pattern ?? "").toLowerCase().split("%").filter(Boolean).every((word) => value.includes(word));
+    })); return this;
+  }
   single() { this.one = true; return this; }
   maybeSingle() { this.one = true; return this; }
-  then(resolve: (value: unknown) => unknown) { return Promise.resolve(resolve({ data: this.one ? this.rows[0] ?? null : this.rows, error: null, count: this.rows.length })); }
+  then(resolve: (value: unknown) => unknown) {
+    this.rows.sort((a, b) => { for (const order of this.orders) { const result = String(this.value(a, order.key) ?? "").localeCompare(String(this.value(b, order.key) ?? "")); if (result) return order.ascending ? result : -result; } return 0; });
+    return Promise.resolve(resolve({ data: this.one ? this.rows[0] ?? null : this.rows.slice(this.start, this.end + 1), error: null, count: this.rows.length }));
+  }
 }
 export async function createClient() {
   return {

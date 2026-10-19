@@ -12,14 +12,14 @@ import { pluralUnit, stockQuantity, type StockMedicine } from "@/lib/medicine-un
 import { receiveStockSchema } from "@/lib/guided-medicine";
 
 const emptyStock = { unit_key: "base", quantity: "", batch_number: "", expiry_date: "", total_cost: "", supplier_id: "" };
-export function RestockForm({ initialMedicine = null, suppliers = [] }: { initialMedicine?: StockMedicine | null; suppliers?: SupplierOption[] }) {
+export function RestockForm({ initialMedicine = null, initialSupplierId = "", suppliers = [] }: { initialMedicine?: StockMedicine | null; initialSupplierId?: string; suppliers?: SupplierOption[] }) {
   const [medicine, setMedicine] = useState(initialMedicine);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<StockMedicine[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchVersion, setSearchVersion] = useState(0);
   const [error, setError] = useState("");
-  const [stock, setStock] = useState(emptyStock);
+  const [stock, setStock] = useState({ ...emptyStock, supplier_id: suppliers.some((supplier) => supplier.id === initialSupplierId) ? initialSupplierId : "" });
   const [review, setReview] = useState(false);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState<number | null>(null);

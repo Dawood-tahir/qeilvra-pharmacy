@@ -20,6 +20,7 @@ export async function createPurchaseAction(input: unknown) {
   const { data, error } = await supabase.rpc("create_purchase", { p_data: { supplier_id: parsed.data.supplier_id, supplier_invoice_number: parsed.data.supplier_invoice_number, invoice_date: parsed.data.invoice_date, discount: parsed.data.discount, notes: parsed.data.notes }, p_items: parsed.data.items });
   if (error) return { ok: false as const, uncertain: saveOutcomeUnknown(error.code), error: saveOutcomeUnknown(error.code) ? "Could not confirm the draft. Check Purchases for this invoice before entering it again." : error.message.includes("Expired stock") ? error.message : "Purchase draft could not be created. Check the quantities, costs and discount." };
   revalidatePath("/purchases");
+  revalidatePath("/suppliers/[id]", "page");
   return { ok: true as const, id: data as string };
 }
 
@@ -30,6 +31,7 @@ export async function postPurchaseAction(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("post_purchase", { p_purchase_id: id.data });
   if (error) return { ok: false, error: "Could not confirm stock posting. Check the purchase status before trying again." };
+  revalidatePath("/suppliers/[id]", "page");
   revalidatePath("/purchases"); revalidatePath(`/purchases/${id.data}`); revalidatePath("/stock"); revalidatePath("/dashboard"); revalidatePath("/medicines"); revalidatePath("/pos");
   return { ok: true, message: "Purchase posted. Stock is now available." };
 }
