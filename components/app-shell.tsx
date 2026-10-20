@@ -95,7 +95,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
   }, [router]);
 
   return (
-    <div className={cn("min-h-screen transition-[grid-template-columns] duration-200 motion-reduce:transition-none lg:grid print:block print:min-h-0", collapsed ? "lg:grid-cols-[80px_minmax(0,1fr)]" : "lg:grid-cols-[224px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]")}>
+    <div className={cn("q-app-shell min-h-screen transition-[grid-template-columns] duration-200 motion-reduce:transition-none lg:grid print:block print:min-h-0", collapsed ? "lg:grid-cols-[80px_minmax(0,1fr)]" : "lg:grid-cols-[224px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]")}>
       <a href="#main-content" className="no-print fixed left-4 top-2 z-[100] -translate-y-24 rounded-xl bg-white px-4 py-3 text-sm font-bold text-blue-800 shadow-lg focus:translate-y-0">Skip to content</a>
       <aside id="desktop-sidebar" className={cn("q-navigation no-print fixed inset-y-0 left-0 z-40 hidden flex-col overflow-hidden text-white transition-[width] duration-200 motion-reduce:transition-none lg:flex", collapsed ? "w-20" : "w-[224px] xl:w-[260px]")}>
         <div className={cn("p-3", collapsed && "flex flex-col items-center")}><Button variant="ghost" size="icon" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-controls="desktop-sidebar" aria-expanded={!collapsed} onClick={toggleSidebar} className="text-white hover:bg-white/10 hover:text-white"><Menu /></Button><div className={collapsed ? "py-3" : "px-3 py-3"}><BrandMark light compact={collapsed} /></div></div>
@@ -114,7 +114,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
         <header className="q-topbar no-print sticky top-0 z-30 border-b border-slate-200/80">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:h-[72px] lg:px-8">
             <Button variant="ghost" size="icon" className="shrink-0 lg:hidden" aria-label="Open navigation menu" aria-expanded={mobileOpen} aria-controls="mobile-sidebar" onClick={() => { setClosing(false); setMobileOpen(true); }}><Menu /></Button><div className="lg:hidden"><BrandMark compact /></div>
-            <button onClick={() => setSearchOpen(true)} className="hidden h-11 max-w-xl flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 text-left text-sm text-slate-500 hover:border-blue-300 hover:bg-white sm:flex">
+            <button onClick={() => setSearchOpen(true)} className="q-shell-search hidden h-11 max-w-xl flex-1 items-center gap-3 rounded-xl border border-blue-100 bg-white/75 px-4 text-left text-sm text-slate-600 hover:border-blue-300 hover:bg-white sm:flex">
               <Search className="size-4" /><span className="truncate">Search medicines, invoices…</span><kbd className="ml-auto rounded border bg-white px-2 py-0.5 text-[10px] text-slate-400">Ctrl K</kbd>
             </button>
             <button onClick={() => setSearchOpen(true)} className="ml-auto grid size-10 place-items-center rounded-xl text-slate-600 hover:bg-slate-100 sm:hidden" aria-label="Search"><Search /></button>
@@ -128,7 +128,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
         </header>
 
         <div id="main-content" tabIndex={-1} className={cn("min-h-[calc(100vh-4rem)] scroll-mt-20 outline-none", pathname === "/pos" ? "pb-20 lg:min-h-0 lg:pb-0" : "pb-24 lg:pb-0")}>{children}</div>
-        <footer className={cn("hidden border-t border-slate-200 bg-white px-8 py-5 text-xs text-slate-500 lg:items-center lg:justify-between", pathname !== "/pos" && "lg:flex")}>
+        <footer className={cn("q-shell-footer hidden border-t border-slate-200 bg-white px-8 py-5 text-xs text-slate-500 lg:items-center lg:justify-between", pathname !== "/pos" && "lg:flex")}>
           <span>© {new Date().getFullYear()} Qeilvra. All rights reserved.</span><span>Pharmacy Management System</span>
         </footer>
       </div>

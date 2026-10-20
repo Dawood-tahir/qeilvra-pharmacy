@@ -5,11 +5,11 @@ export function Card({ className, surface = "secondary", ...props }: React.HTMLA
   return <div className={cn("q-card rounded-2xl border", `q-glass-${surface}`, className)} {...props} />;
 }
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-1.5 p-5", className)} {...props} />;
+  return <div className={cn("q-card-header flex flex-col gap-1.5 p-5", className)} {...props} />;
 }
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn("text-base font-bold text-slate-950", className)} {...props} />;
+  return <h3 className={cn("q-card-title text-base font-bold text-slate-950", className)} {...props} />;
 }
 export function CardContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-5 pt-0", className)} {...props} />;
+  return <div className={cn("q-card-content p-5 pt-0", className)} {...props} />;
 }

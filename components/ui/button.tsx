@@ -7,11 +7,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "q-button-primary bg-blue-700 text-white shadow-sm hover:bg-blue-800",
-        destructive: "bg-red-600 text-white hover:bg-red-700",
-        outline: "border border-slate-200 bg-white text-slate-800 hover:bg-slate-50",
-        secondary: "bg-blue-50 text-blue-700 hover:bg-blue-100",
-        ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
+        default: "q-button-primary bg-blue-600 text-white shadow-sm hover:bg-blue-700",
+        destructive: "q-button-danger bg-red-600 text-white hover:bg-red-700",
+        outline: "q-button-outline border border-slate-200 bg-white/95 text-slate-800 hover:border-blue-200 hover:bg-blue-50/60",
+        secondary: "q-button-secondary bg-blue-50 text-blue-700 hover:bg-blue-100",
+        ghost: "q-button-ghost text-slate-600 hover:bg-blue-50 hover:text-slate-950",
       },
       size: {
         default: "h-10 px-4 py-2",

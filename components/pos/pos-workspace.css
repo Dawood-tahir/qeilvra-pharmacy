@@ -2,27 +2,36 @@
 .pos-catalog {
   container: pos-catalog / inline-size;
   display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0;
-  border: 1px solid var(--glass-border); border-radius: 20px; padding: 12px; box-shadow: var(--glass-shadow);
+  border: 1px solid var(--glass-border); border-radius: 20px; padding: 12px;
+  box-shadow: inset 0 1px 0 #ffffffeb, var(--glass-shadow);
 }
 .pos-medicines {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
   align-content: start; align-items: start; gap: 10px; min-height: 0; margin-top: 14px; padding: 2px 2px 8px;
 }
-.pos-medicine-card { overflow-wrap: anywhere; background: #ffffffed; transition: border-color 160ms ease, box-shadow 160ms ease; }
+.pos-medicine-card {
+  overflow-wrap: anywhere; border-color: #d6e5f6;
+  background: linear-gradient(145deg, #fffffff5, #f8fbfff5);
+  box-shadow: inset 0 1px 0 #fff, 0 3px 9px #123b7010;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
 .pos-medicine-card h2 { font-size: 15px; line-height: 21px; text-wrap: pretty; }
-.pos-medicine-card:focus-within { border-color: #7daed4; box-shadow: 0 0 0 2px #dcebf6; }
-.pos-selling-units button { min-width: 60px; }
+.pos-medicine-card:focus-within { border-color: #88b0ff; box-shadow: 0 0 0 2px #dce9ff; }
+.pos-selling-units button { min-width: 60px; background: #ffffffb8; border-color: #d8e5f5; font-size: 13px; }
+.pos-selling-units button[aria-pressed="true"] { border-color: var(--blue-600); background: #eaf1ff; color: #124bd1; }
+.pos-selling-units button:focus-visible { outline-offset: 2px; }
 .pos-medicine-actions > .pos-quantity { flex: 1; justify-content: space-between; }
 .pos-medicine-actions > .pos-quantity input { min-width: 0; width: 40px; }
 .pos-medicine-actions > .pos-quantity button { width: 36px; }
 .pos-medicine-actions > .q-button { flex: 1; min-width: 100px; }
-.pos-quantity { background: white; }
+.pos-quantity { border-color: #d5e3f4; background: #ffffffed; box-shadow: 0 1px 3px #123b7008; }
 .pos-quantity input { appearance: textfield; }
 .pos-quantity input::-webkit-inner-spin-button,
 .pos-quantity input::-webkit-outer-spin-button { appearance: none; margin: 0; }
-.pos-quantity button { border-radius: 10px; }
+.pos-quantity button { border-radius: 10px; color: #153d79; }
+.pos-quantity button:hover:not(:disabled) { background: #edf3ff; }
 @media (hover: hover) {
-  .pos-medicine-card:hover { border-color: #a9c8df; box-shadow: 0 3px 10px #183d6110; }
+  .pos-medicine-card:hover { border-color: #b0c9ee; box-shadow: inset 0 1px 0 #fff, 0 5px 14px #123b7015; }
 }
 .pos-cart-desktop { display: none; }
 .pos-cart-dialog { container: pos-frame / size; overflow: hidden; }
@@ -30,38 +39,46 @@ html:has(.pos-cart-dialog[open]), body:has(.pos-cart-dialog[open]) { overflow: h
 .pos-cart {
   container: pos-cart / inline-size;
   display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0;
-  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; background: #ffffffb8;
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; background: #f7fbffcc;
 }
-.pos-cart-header { min-height: 56px; background: #f8fbfff5; }
-.pos-cart-header h2 { font-size: 19px; }
+.pos-cart-header { min-height: 56px; padding-inline: 14px; border-color: #dce8f6; background: #f9fcfff5; }
+.pos-cart-header h2 { font-size: 19px; letter-spacing: -.025em; }
 /* The list takes all remaining space; the complete bill stays below it. */
 .pos-cart-items {
   flex: 1 1 0; min-height: 104px; overflow-y: auto; overscroll-behavior: contain;
-  background: #ffffffdf; scroll-padding-block: 8px;
+  background: #ffffffbd; scroll-padding-block: 8px;
 }
-.pos-cart-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; padding: 10px 14px; }
+.pos-cart-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+  gap: 4px 8px; padding: 10px 14px; border-color: #e5edf8;
+}
 .pos-cart-description { grid-column: 1; }
 .pos-cart-row > .pos-quantity { grid-column: 1; grid-row: 2; justify-self: start; }
 .pos-cart-line-price { grid-column: 2; grid-row: 1; }
 .pos-cart-remove { grid-column: 2; grid-row: 2; }
-.pos-cart-remove { width: 40px; height: 44px; }
+.pos-cart-remove { width: 40px; height: 44px; color: #b34050; }
 .pos-cart-quantity button { width: 40px; height: 44px; }
 .pos-cart-quantity input { height: 44px; width: 56px; font-size: 14px; }
 .pos-cart-line-price { font-variant-numeric: tabular-nums; }
 .pos-cart-summary {
-  flex-shrink: 0; display: grid; gap: 8px; border-top: 1px solid #d8e5f2;
+  flex-shrink: 0; display: grid; gap: 7px; border-top: 1px solid #d6e5f6;
   padding: 12px 14px max(12px, env(safe-area-inset-bottom));
-  background: linear-gradient(145deg, #f7fbff, #edf5ff); overflow-wrap: anywhere; scroll-margin-block: 12px;
+  background: linear-gradient(155deg, #f9fcfff5, #edf5fff5);
+  box-shadow: inset 0 1px 0 #fff; overflow-wrap: anywhere; scroll-margin-block: 12px;
 }
-.pos-subtotal { min-height: 28px; }
-.pos-billing-controls { display: grid; gap: 8px; min-width: 0; }
-.pos-billing-details { min-width: 0; border: 1px solid #dce7f3; border-radius: 12px; background: #ffffffd9; }
+.pos-subtotal { min-height: 24px; }
+.pos-billing-controls { display: grid; gap: 7px; min-width: 0; }
+.pos-billing-details {
+  min-width: 0; border: 1px solid #d7e5f6; border-radius: 12px;
+  background: #ffffffd9; box-shadow: 0 1px 3px #123b7005;
+}
 .pos-billing-details summary {
   display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 10px;
   border-radius: 11px; font-size: 14px; font-weight: 700; list-style: none;
 }
 .pos-billing-details summary::-webkit-details-marker { display: none; }
-.pos-billing-details summary:hover { background: #edf5ff; }
+.pos-billing-details summary:hover { background: #edf3ff; }
+.pos-billing-details summary:focus-visible { outline-offset: 2px; }
 .pos-adjustment-amount { min-width: 0; margin-left: auto; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
 .pos-billing-details[open] > summary { border-bottom: 1px solid #e2ebf5; border-radius: 11px 11px 0 0; }
 .pos-billing-details[open] > summary .pos-disclosure-chevron { transform: rotate(180deg); }
@@ -69,8 +86,11 @@ html:has(.pos-cart-dialog[open]), body:has(.pos-cart-dialog[open]) { overflow: h
 .pos-discount-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); align-items: end; gap: 8px; }
 .pos-discount-fields > * { margin: 0; }
 .pos-billing-input { height: 44px; min-height: 44px; }
-.pos-final-total { min-height: 42px; }
+.pos-final-total { min-height: 40px; padding-top: 8px; border-color: #d6e5f6; letter-spacing: -.025em; }
+.pos-final-total > :last-child { color: #124bd1; }
 .pos-print-controls { min-height: 44px; }
+.pos-checkout { box-shadow: inset 0 1px 0 #ffffff26, 0 3px 8px #155dfc26; }
+.pos-return { background: #ffffffd9; }
 @container pos-cart (max-width: 300px) {
   .pos-cart-summary { padding-inline: 10px; }
   .pos-cart-row { padding-inline: 10px; }
@@ -102,6 +122,10 @@ html:has(.pos-cart-dialog[open]), body:has(.pos-cart-dialog[open]) { overflow: h
     display: block; flex: 0 0 clamp(360px, 30vw, 460px); min-width: 0; overflow: hidden;
     border: 1px solid var(--glass-border); border-radius: 20px;
   }
+}
+/* Wider counters can show quantity, price and remove beside each medicine. */
+@media (min-width: 1280px) {
+  .pos-cart-desktop { flex-basis: clamp(424px, 31vw, 480px); }
 }
 @media (min-width: 1024px) and (max-width: 1279px) {
   .pos-workspace { gap: 12px; padding: 12px; }
