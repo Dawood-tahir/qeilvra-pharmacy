@@ -92,24 +92,23 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
   }, [router]);
 
   return (
-    <div className={cn("min-h-screen transition-[grid-template-columns] duration-200 motion-reduce:transition-none lg:grid print:block print:min-h-0", collapsed ? "lg:grid-cols-[80px_minmax(0,1fr)]" : "lg:grid-cols-[260px_minmax(0,1fr)]")}>
-      <aside id="desktop-sidebar" className={cn("no-print fixed inset-y-0 left-0 z-40 hidden flex-col overflow-hidden bg-[linear-gradient(160deg,#071b45_0%,#0b4380_72%,#0c617a_120%)] text-white shadow-xl transition-[width] duration-200 motion-reduce:transition-none lg:flex", collapsed ? "w-20" : "w-[260px]")}>
+    <div className={cn("min-h-screen transition-[grid-template-columns] duration-200 motion-reduce:transition-none lg:grid print:block print:min-h-0", collapsed ? "lg:grid-cols-[80px_minmax(0,1fr)]" : "lg:grid-cols-[224px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]")}>
+      <a href="#main-content" className="no-print fixed left-4 top-2 z-[100] -translate-y-24 rounded-xl bg-white px-4 py-3 text-sm font-bold text-blue-800 shadow-lg focus:translate-y-0">Skip to content</a>
+      <aside id="desktop-sidebar" className={cn("q-navigation no-print fixed inset-y-0 left-0 z-40 hidden flex-col overflow-hidden text-white transition-[width] duration-200 motion-reduce:transition-none lg:flex", collapsed ? "w-20" : "w-[224px] xl:w-[260px]")}>
         <div className={cn("p-3", collapsed && "flex flex-col items-center")}><Button variant="ghost" size="icon" aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"} aria-controls="desktop-sidebar" aria-expanded={!collapsed} onClick={toggleSidebar} className="text-white hover:bg-white/10 hover:text-white"><Menu /></Button><div className={collapsed ? "py-3" : "px-3 py-3"}><BrandMark light compact={collapsed} /></div></div>
         <nav className="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-3 py-2" aria-label="Primary navigation">
           {nav.map(({ href, label, icon: Icon }) => (
-            <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} title={collapsed ? label : undefined} aria-label={label} aria-current={isActive(href) ? "page" : undefined} className={cn("flex h-12 items-center gap-3 rounded-xl px-4 text-sm font-medium text-blue-100 transition hover:bg-white/10 hover:text-white", isActive(href) && "bg-blue-500/70 text-white shadow-sm ring-1 ring-white/20", collapsed && "justify-center px-0")}>
+            <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} title={collapsed ? label : undefined} aria-label={label} aria-current={isActive(href) ? "page" : undefined} className={cn("q-nav-link flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium text-blue-100 transition hover:bg-white/10 hover:text-white", collapsed && "justify-center px-0")}>
               <Icon className="size-5 shrink-0" /><span className={collapsed ? "sr-only" : undefined}>{label}</span>
             </Link>
           ))}
         </nav>
-        <div className={cn("m-4 rounded-2xl border border-white/10 bg-white/8 p-4", collapsed && "hidden")}>
-          <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-white/10 font-bold">Q</span><span><span className="block text-sm font-bold">Qeilvra</span><span className="block text-[10px] text-blue-200">Secure pharmacy operations</span></span></div>
-        </div>
+        <p className={cn("mx-4 mb-2 mt-3 border-t border-white/10 pt-3 text-[10px] text-blue-200", collapsed && "hidden")}>Secure pharmacy operations</p>
         <form action="/auth/signout" method="post" className="px-4 pb-4"><Button variant="ghost" aria-label="Sign out" title={collapsed ? "Sign out" : undefined} className={cn("w-full justify-start text-white hover:bg-white/10 hover:text-white", collapsed && "justify-center px-0")}><LogOut /><span className={collapsed ? "sr-only" : undefined}>Sign out</span></Button></form>
       </aside>
 
       <div className="min-w-0 lg:col-start-2">
-        <header className="no-print sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
+        <header className="q-topbar no-print sticky top-0 z-30 border-b border-slate-200/80">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:h-[72px] lg:px-8">
             <Button variant="ghost" size="icon" className="shrink-0 lg:hidden" aria-label="Open navigation menu" aria-expanded={mobileOpen} aria-controls="mobile-sidebar" onClick={() => { setClosing(false); setMobileOpen(true); }}><Menu /></Button><div className="lg:hidden"><BrandMark compact /></div>
             <button onClick={() => setSearchOpen(true)} className="hidden h-11 max-w-xl flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 text-left text-sm text-slate-500 hover:border-blue-300 hover:bg-white sm:flex">
@@ -125,17 +124,17 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
           </div>
         </header>
 
-        <div className="min-h-[calc(100vh-4rem)] pb-24 lg:pb-0">{children}</div>
+        <div id="main-content" tabIndex={-1} className="min-h-[calc(100vh-4rem)] scroll-mt-20 pb-24 outline-none lg:pb-0">{children}</div>
         <footer className="hidden border-t border-slate-200 bg-white px-8 py-5 text-xs text-slate-500 lg:flex lg:items-center lg:justify-between">
           <span>© {new Date().getFullYear()} Qeilvra. All rights reserved.</span><span>Pharmacy Management System</span>
         </footer>
       </div>
 
-      <nav className="no-print safe-bottom fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-slate-200 bg-white/95 px-1 pt-2 shadow-[0_-8px_25px_rgba(15,23,42,.08)] backdrop-blur-xl lg:hidden" aria-label="Mobile navigation">
+      <nav className="q-mobile-nav no-print safe-bottom fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-slate-200 px-1 pt-2 shadow-[0_-8px_25px_rgba(15,23,42,.08)] lg:hidden" aria-label="Mobile navigation">
         {mobilePrimary.map(({ href, label, icon: Icon }) => {
           const allowed = nav.some((item) => item.href === href) || href === "/alerts";
           if (!allowed) return null;
-          return <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} className={cn("flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold text-slate-500", isActive(href) && "text-blue-700")}><Icon className={cn("size-5", isActive(href) && "fill-blue-100")} /><span>{label}</span></Link>;
+          return <Link prefetch={pathname === "/pos" ? false : null} key={href} href={href} aria-current={isActive(href) ? "page" : undefined} className={cn("flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold text-slate-500", isActive(href) && "bg-blue-50 text-blue-800")}><Icon className="size-5" /><span>{label}</span></Link>;
         })}
         <button onClick={() => setMoreOpen(true)} className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold text-slate-500"><MoreHorizontal className="size-5" /><span>More</span></button>
       </nav>
@@ -149,8 +148,14 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
           <form action="/auth/signout" method="post" className="mt-3"><Button variant="outline" className="w-full text-red-600"><LogOut /> Sign out</Button></form>
         </div>
       </Dialog>}
-      {mobileOpen && <Dialog label="Navigation menu" onClose={closeDrawer} busy={closing} className={cn("inset-y-0 left-0 right-auto m-0 flex h-dvh max-h-dvh w-[min(300px,85vw)] max-w-none flex-col rounded-none bg-[linear-gradient(160deg,#071b45_0%,#0b4380_72%,#0c617a_120%)] p-3 text-white sm:p-3", closing ? "sidebar-closing" : "sidebar-opening")}>
-        <div id="mobile-sidebar" className="flex h-full min-h-0 flex-col"><div className="flex items-center gap-3 pb-4"><Button variant="ghost" size="icon" aria-label="Close navigation menu" onClick={closeDrawer} className="shrink-0 text-white hover:bg-white/10 hover:text-white"><Menu /></Button><BrandMark light /></div><nav aria-label="Mobile sidebar navigation" className="scrollbar-thin min-h-0 flex-1 space-y-1 overflow-y-auto">{nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} prefetch={pathname === "/pos" ? false : null} aria-current={isActive(href) ? "page" : undefined} onClick={() => { setMobileOpen(false); setClosing(false); }} className={cn("flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm text-blue-100 hover:bg-white/10", isActive(href) && "bg-blue-500/70 text-white")}><Icon className="size-5 shrink-0" />{label}</Link>)}</nav><form action="/auth/signout" method="post" className="pt-4"><Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10 hover:text-white"><LogOut /> Sign out</Button></form></div>
+      {mobileOpen && <Dialog label="Navigation menu" onClose={closeDrawer} busy={closing} className={cn("q-navigation inset-y-0 left-0 right-auto m-0 flex h-dvh max-h-dvh w-[min(300px,85vw)] max-w-none flex-col rounded-none p-3 text-white sm:p-3", closing ? "sidebar-closing" : "sidebar-opening")}>
+        <div id="mobile-sidebar" className="flex h-full min-h-0 flex-col">
+          <div className="flex items-center gap-3 pb-4"><Button variant="ghost" size="icon" aria-label="Close navigation menu" onClick={closeDrawer} className="shrink-0 text-white hover:bg-white/10 hover:text-white"><Menu /></Button><BrandMark light /></div>
+          <nav aria-label="Mobile sidebar navigation" className="scrollbar-thin min-h-0 flex-1 space-y-1 overflow-y-auto">
+            {nav.map(({ href, label, icon: Icon }) => <Link key={href} href={href} prefetch={pathname === "/pos" ? false : null} aria-current={isActive(href) ? "page" : undefined} onClick={() => { setMobileOpen(false); setClosing(false); }} className="q-nav-link flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm text-blue-100 hover:bg-white/10"><Icon className="size-5 shrink-0" />{label}</Link>)}
+          </nav>
+          <form action="/auth/signout" method="post" className="pt-4"><Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10 hover:text-white"><LogOut /> Sign out</Button></form>
+        </div>
       </Dialog>}
       {searchOpen && <Suspense fallback={<DialogLoading label="Global search" onClose={() => setSearchOpen(false)} />}><GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} /></Suspense>}
     </div>

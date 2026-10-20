@@ -21,7 +21,7 @@ export type FinancialMetrics = {
   sales_count: number; gross_sales: number; discounts: number; refunds: number; medicine_revenue: number;
   extra_charge_revenue: number; revenue: number; cogs: number; gross_profit: number; expenses: number; net_operating_profit: number; stock_written_off: number; supplier_returns_value: number; supplier_recoveries: number; supplier_replacements_value: number; net_inventory_loss: number;
 };
-export type FinancialPoint = FinancialMetrics & { bucket_start: string; sale_date: string };
+export type FinancialPoint = FinancialMetrics & { bucket_start: string; sale_date: string; purchases?: number };
 export type FinancialTrendPoint = Pick<FinancialPoint, "bucket_start" | "sale_date" | "revenue" | "gross_profit">;
 export type FinancialSnapshot = {
   from: string; to: string; granularity: "hour" | "day"; generated_at: string;
@@ -30,6 +30,7 @@ export type FinancialSnapshot = {
   expense_categories: { category: string; amount: number }[];
   salespeople?: { id: string; full_name: string; sales_count: number; revenue: number }[];
   purchases_total?: number;
+  purchases_count?: number;
   legacy_cost_estimates: number;
   inventory?: { total_medicines: number; low_stock_items: number; out_of_stock_items: number };
 };

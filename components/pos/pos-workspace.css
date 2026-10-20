@@ -7,13 +7,27 @@
   min-width: 0;
 }
 
-.pos-cart-header { min-height: 52px; }
+.pos-cart-header { min-height: 52px; background-color: #f8fbff; }
+
+/* Depth belongs to the workspace edges. Medicines and cart rows stay opaque
+   so prices, units and quantities remain clear during fast daily sales. */
+.pos-medicine-card { transition: border-color 160ms ease, box-shadow 160ms ease; }
+.pos-medicine-card:focus-within { border-color: #7daed4; box-shadow: 0 0 0 2px #dcebf6; }
+
+@media (hover: hover) {
+  .pos-medicine-card:hover { border-color: #a9c8df; box-shadow: 0 3px 10px #183d6110; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pos-medicine-card { transition: none; }
+}
 
 .pos-cart-items {
   flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  background: #fff;
 }
 
 .pos-cart-row { padding: 8px 12px; }
@@ -27,6 +41,7 @@
 .pos-bill-extra { border-top: 1px solid #e2e8f0; padding-top: 10px; }
 .pos-billing-input { height: 44px; min-height: 44px; }
 .pos-cart-summary { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+.pos-cart-summary { background-color: #f1f6fc; }
 .pos-cart-dialog { overflow: hidden; }
 html:has(.pos-cart-dialog[open]),
 body:has(.pos-cart-dialog[open]) { overflow: hidden; }

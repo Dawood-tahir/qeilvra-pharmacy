@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { financeRange } from "@/lib/financial-analytics";
+import { withReceiptPurchases } from "@/lib/purchase-analytics";
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -16,5 +17,10 @@ export async function GET(request: Request) {
   const { data, error } = await supabase.rpc("owner_financial_analytics", { p_from: range.from, p_to: range.to, p_granularity: range.granularity });
   if (error?.code === "42501") return NextResponse.json({ error: "Owner permission required." }, { status: 403, headers: { "Cache-Control": "private, no-store" } });
   if (error || !data?.metrics) return NextResponse.json({ error: "Financial figures could not load. Please retry." }, { status: 503, headers: { "Cache-Control": "private, no-store" } });
-  return NextResponse.json(data, { headers: { "Cache-Control": "private, no-store", "Server-Timing": `analytics;dur=${(performance.now() - started).toFixed(1)}` } });
+  try {
+    const snapshot = await withReceiptPurchases(supabase, data);
+    return NextResponse.json(snapshot, { headers: { "Cache-Control": "private, no-store", "Server-Timing": `analytics;dur=${(performance.now() - started).toFixed(1)}` } });
+  } catch {
+    return NextResponse.json({ error: "Stock purchase figures could not load. Please retry." }, { status: 503, headers: { "Cache-Control": "private, no-store" } });
+  }
 }

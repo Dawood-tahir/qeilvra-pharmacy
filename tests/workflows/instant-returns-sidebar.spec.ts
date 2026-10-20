@@ -117,7 +117,7 @@ for (const role of ["owner", "salesperson"]) test(role + " sidebar toggles witho
     await page.reload(); await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
     await page.screenshot({ path: `test-results/sidebar-collapsed-${role}-${test.info().project.name}.png`, fullPage: true });
     await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
-    await expect.poll(async () => Math.round((await sidebar.boundingBox())!.width)).toBe(260);
+    await expect.poll(async () => Math.round((await sidebar.boundingBox())!.width)).toBe(page.viewportSize()!.width < 1280 ? 224 : 260);
   } else {
     const trigger = page.getByRole("button", { name: "Open navigation menu", exact: true });
     await trigger.click();

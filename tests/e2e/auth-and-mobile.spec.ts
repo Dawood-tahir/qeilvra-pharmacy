@@ -7,8 +7,10 @@ test("protected routes redirect anonymous users", async ({ page }) => {
 
 test("login is usable without horizontal overflow", async ({ page }) => {
   await page.goto("/login");
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   expect(overflow).toBe(false);
+  await page.screenshot({ path: `test-results/login-${test.info().project.name}.png`, fullPage: true, caret: "initial" });
 });
 
 test.describe("configured authenticated flows", () => {

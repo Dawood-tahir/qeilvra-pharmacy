@@ -3,6 +3,7 @@ import { DashboardView } from "@/components/dashboard/dashboard-view";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { financeRange, type FinancialSnapshot } from "@/lib/financial-analytics";
+import { withReceiptPurchases } from "@/lib/purchase-analytics";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -21,5 +22,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   if ([metricsResult, lowResult, expiringResult, salesResult].some(result => result.error)) throw new Error("Dashboard could not be loaded. Please retry.");
   if (owner && !metricsResult.data?.metrics) throw new Error("Financial figures could not be loaded. Please retry.");
   const recentSales = (salesResult.data ?? []).map((sale: Record<string, unknown>) => ({ ...sale, item_count: (sale.sale_items as { count: number }[] | undefined)?.[0]?.count ?? 0, payment_method: (sale.payments as { method: string }[] | undefined)?.[0]?.method }));
-  return <DashboardView role={staff.role} name={staff.fullName} metrics={owner ? metricsResult.data.inventory : metricsResult.data} financial={owner ? metricsResult.data as FinancialSnapshot : undefined} range={range} lowStock={(lowResult.data ?? []) as never} expiring={(expiringResult.data ?? []) as never} recentSales={recentSales as never} />;
+  const financial = owner ? await withReceiptPurchases(supabase, metricsResult.data as FinancialSnapshot) : undefined;
+  return <DashboardView role={staff.role} name={staff.fullName} metrics={owner ? metricsResult.data.inventory : metricsResult.data} financial={financial} range={range} lowStock={(lowResult.data ?? []) as never} expiring={(expiringResult.data ?? []) as never} recentSales={recentSales as never} />;
 }

@@ -15,6 +15,7 @@ class FixtureQuery {
   constructor(table: string) {
     const profile = location.pathname.startsWith("/suppliers/") || (location.pathname.startsWith("/purchases/") && ![purchase.id, "new"].includes(location.pathname.split("/").at(-1)!));
     this.rows = [...((profile ? supplierFixtureTables() : tables)[table] ?? [])];
+    if (table === "purchases" && ["/dashboard", "/reports"].includes(location.pathname)) this.rows = new URLSearchParams(location.search).has("empty") ? [] : [...this.rows, { ...purchase, id: "90000000-0000-4000-8000-000000000010", status: "posted", posted_at: new Date().toISOString() }];
     if (new URLSearchParams(location.search).has("stock")) this.rows = [...(stockFixtureTables()[table] ?? this.rows)];
     if (table === "suppliers" && new URLSearchParams(location.search).get("suppliers") === "none") this.rows = [];
   }
@@ -22,10 +23,12 @@ class FixtureQuery {
   select() { return this; }
   eq(key: string, value: unknown) { this.rows = this.rows.filter((row) => this.value(row, key) === value); return this; }
   in(key: string, values: unknown[]) { this.rows = this.rows.filter((row) => values.includes(this.value(row, key))); return this; }
-  gt(key: string, value: number) { this.rows = this.rows.filter((row) => Number(this.value(row, key)) > value); return this; }
+  compare(key: string, left: unknown, right: string | number) { const a = key.endsWith("_at") ? Date.parse(String(left)) : typeof right === "number" ? Number(left) : String(left); const b = key.endsWith("_at") ? Date.parse(String(right)) : right; return a < b ? -1 : a > b ? 1 : 0; }
+  gt(key: string, value: string | number) { this.rows = this.rows.filter((row) => this.compare(key, this.value(row, key), value) > 0); return this; }
   ilike(key: string, value: string) { this.rows = this.rows.filter((row) => String(row[key]).toLowerCase().includes(value.replaceAll("%", "").toLowerCase())); return this; }
-  gte(key: string, value: string) { this.rows = this.rows.filter((row) => String(this.value(row, key)) >= value); return this; }
-  lte() { return this; }
+  gte(key: string, value: string) { this.rows = this.rows.filter((row) => this.compare(key, this.value(row, key), value) >= 0); return this; }
+  lt(key: string, value: string) { this.rows = this.rows.filter((row) => this.compare(key, this.value(row, key), value) < 0); return this; }
+  lte(key: string, value: string) { this.rows = this.rows.filter((row) => this.compare(key, this.value(row, key), value) <= 0); return this; }
   order(key: string, options?: { ascending?: boolean }) { this.orders.push({ key, ascending: options?.ascending !== false }); return this; }
   limit(limit: number) { this.end = limit - 1; return this; }
   range(start: number, end: number) { this.start = start; this.end = end; return this; }

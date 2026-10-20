@@ -15,5 +15,8 @@ export default defineConfig({
     { name: "mobile-430", use: { viewport: { width: 430, height: 932 }, hasTouch: true } },
     { name: "tablet-768", use: { viewport: { width: 768, height: 1024 }, hasTouch: true } },
     { name: "desktop-1024", use: { viewport: { width: 1024, height: 800 } } },
+    { name: "laptop-1280", use: { viewport: { width: 1280, height: 720 } } },
+    { name: "desktop-1920", use: { viewport: { width: 1920, height: 1080 } } },
+    { name: "short-laptop", use: { viewport: { width: 1280, height: 600 } } },
   ],
 });

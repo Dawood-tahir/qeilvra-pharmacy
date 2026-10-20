@@ -2,7 +2,7 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const variants = cva("inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold", {
+const variants = cva("inline-flex max-w-full items-center rounded-lg px-2 py-1 text-xs font-semibold leading-4", {
   variants: {
     variant: {
       default: "bg-blue-50 text-blue-700",
