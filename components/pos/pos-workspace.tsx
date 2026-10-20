@@ -26,10 +26,10 @@ const cartSchema = z.array(z.object({
   unit: z.object({ unit_key: z.string(), label: z.string(), base_quantity: z.number().int().positive(), selling_price: z.number().positive(), max_price: z.number().nonnegative().nullish() }),
 }).passthrough());
 
-export function PosWorkspace({ role, staffId = "local" }: { role: AppRole; staffId?: string }) {
+export function PosWorkspace({ role, staffId = "local", initialMedicines }: { role: AppRole; staffId?: string; initialMedicines?: StockMedicine[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [medicines, setMedicines] = useState<StockMedicine[]>([]);
+  const [medicines, setMedicines] = useState<StockMedicine[]>(initialMedicines ?? []);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -52,6 +52,7 @@ export function PosWorkspace({ role, staffId = "local" }: { role: AppRole; staff
   const [searchVersion, setSearchVersion] = useState(0);
   const [preferredUnits, setPreferredUnits] = useState<Record<string, string>>({});
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchStarted = useRef(false);
   const busyRef = useRef(false);
   const storageKey = "qeilvra-cart-v2-" + staffId;
   const totals = useMemo(() => posTotals(cart, discount, discountMode, extraAmount), [cart, discount, discountMode, extraAmount]);
@@ -80,6 +81,10 @@ export function PosWorkspace({ role, staffId = "local" }: { role: AppRole; staff
     if (restored) { try { sessionStorage.setItem(storageKey, JSON.stringify({ cart, request, saleResult, discount, discountMode, extraAmount, extraDescription })); } catch { /* Counter still works when storage is unavailable. */ } }
   }, [cart, request, saleResult, discount, discountMode, extraAmount, extraDescription, restored, storageKey]);
   useEffect(() => {
+    // Server results cover only the first empty search. Clearing a later search,
+    // retrying, and completing checkout must still read current stock from the API.
+    if (!searchStarted.current && initialMedicines !== undefined && !query && searchVersion === 0) return;
+    searchStarted.current = true;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       setLoading(true); setSearchError("");
@@ -92,7 +97,7 @@ export function PosWorkspace({ role, staffId = "local" }: { role: AppRole; staff
       finally { if (!controller.signal.aborted) setLoading(false); }
     }, query ? 220 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [query, searchVersion]);
+  }, [query, searchVersion, initialMedicines]);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => { if (e.key === "F4") { e.preventDefault(); searchRef.current?.focus(); } };
     window.addEventListener("keydown", listener); return () => window.removeEventListener("keydown", listener);

@@ -65,6 +65,8 @@ try {
     file(db, "tests/database/financial-analytics.sql");
     file(db, "supabase/migrations/202610190014_stock_dispositions.sql");
     file(db, "tests/database/stock-dispositions.sql");
+    file(db, "supabase/migrations/202610200015_supplier_summary.sql");
+    file(db, "tests/database/supplier-summary.sql");
     file(db, "tests/database/audit-security.sql");
     const sale = "set role authenticated; select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',false); begin; select * from public.checkout_sale(jsonb_build_array(jsonb_build_object('medicine_id',(select id from public.test_ids where label='syrup'),'unit_key','base','quantity',1)),'cash',150,0,gen_random_uuid()); select pg_sleep(0.4); commit;";
     const results = await Promise.all([parallelSql(db, sale), parallelSql(db, sale)]);

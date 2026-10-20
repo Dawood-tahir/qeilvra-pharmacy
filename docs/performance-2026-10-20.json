@@ -1,0 +1,235 @@
+{
+  "date": "2026-10-20",
+  "timezone": "Asia/Karachi",
+  "units": "milliseconds",
+  "localProduction": {
+    "conditions": "Pakistan client; sequential alternating warm samples; 20 samples per cohort; read-only business queries; temporary verified staff sessions; no checkout or financial writes",
+    "regionComparison": false,
+    "hosts": [
+      {
+        "name": "before",
+        "roles": [
+          {
+            "role": "owner",
+            "medicineSearch": {
+              "n": 20,
+              "median": 1007,
+              "p95": 2350
+            },
+            "posNavigation": {
+              "n": 20,
+              "median": 2417,
+              "p95": 3007
+            },
+            "inventoryNavigation": {
+              "n": 20,
+              "median": 2946,
+              "p95": 6026
+            },
+            "initialSearchRequests": 20
+          },
+          {
+            "role": "salesperson",
+            "medicineSearch": {
+              "n": 20,
+              "median": 850,
+              "p95": 1610
+            }
+          }
+        ]
+      },
+      {
+        "name": "optimized",
+        "roles": [
+          {
+            "role": "owner",
+            "medicineSearch": {
+              "n": 20,
+              "median": 1170,
+              "p95": 2354
+            },
+            "posNavigation": {
+              "n": 20,
+              "median": 1893,
+              "p95": 3078
+            },
+            "inventoryNavigation": {
+              "n": 20,
+              "median": 2918,
+              "p95": 8506
+            },
+            "initialSearchRequests": 0
+          },
+          {
+            "role": "salesperson",
+            "medicineSearch": {
+              "n": 20,
+              "median": 765,
+              "p95": 1440
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "fixtureInteractions": {
+    "conditions": "20 warm sequential samples; local production login/static assets; isolated Vite POS fixture with 80ms API delay; no business writes",
+    "before": [
+      {
+        "width": 1440,
+        "cart": {
+          "n": 20,
+          "median": 121.4,
+          "p95": 176.6
+        },
+        "search": {
+          "n": 20,
+          "median": 408.3,
+          "p95": 429.2
+        },
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "cart": {
+          "n": 20,
+          "median": 110,
+          "p95": 197.5
+        },
+        "search": {
+          "n": 20,
+          "median": 377.9,
+          "p95": 449.8
+        },
+        "overflow": false
+      }
+    ],
+    "after": [
+      {
+        "width": 1440,
+        "cart": {
+          "n": 20,
+          "median": 157.6,
+          "p95": 186
+        },
+        "search": {
+          "n": 20,
+          "median": 411.2,
+          "p95": 435.8
+        },
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "cart": {
+          "n": 20,
+          "median": 172.1,
+          "p95": 213.4
+        },
+        "search": {
+          "n": 20,
+          "median": 419.9,
+          "p95": 441.1
+        },
+        "overflow": false
+      }
+    ],
+    "note": "Playwright driver-to-visible-result timings include automation overhead; simultaneous verification/build activity varied. No cart or search-API implementation optimization was attempted."
+  },
+  "localLoginControl": {
+    "before": {
+      "n": 20,
+      "median": 29.1,
+      "p95": 60.8
+    },
+    "after": {
+      "n": 20,
+      "median": 19.9,
+      "p95": 29.5
+    },
+    "note": "No login implementation change; variation is not attributed to these fixes. Warm assets were browser-cached."
+  },
+  "verification": {
+    "conditions": "Local production Next.js; verified staff sessions; hosted read-only data; no business writes",
+    "checks": [
+      {
+        "role": "owner",
+        "width": 1440,
+        "initialApiRequests": 0,
+        "check": "SSR results, no duplicate search request, no horizontal overflow",
+        "pass": true
+      },
+      {
+        "role": "owner",
+        "width": 1440,
+        "check": "Inventory search uses Next.js navigation with no document reload",
+        "pass": true
+      },
+      {
+        "role": "owner",
+        "width": 390,
+        "initialApiRequests": 0,
+        "check": "SSR results, no duplicate search request, no horizontal overflow",
+        "pass": true
+      },
+      {
+        "role": "owner",
+        "width": 390,
+        "check": "Inventory search uses Next.js navigation with no document reload",
+        "pass": true
+      },
+      {
+        "role": "owner",
+        "check": "Medicine results present in server HTML with JavaScript disabled",
+        "pass": true
+      },
+      {
+        "role": "salesperson",
+        "width": 1440,
+        "initialApiRequests": 0,
+        "check": "SSR results, no duplicate search request, no horizontal overflow",
+        "pass": true
+      },
+      {
+        "role": "salesperson",
+        "width": 1440,
+        "check": "Inventory search uses Next.js navigation with no document reload",
+        "pass": true
+      },
+      {
+        "role": "salesperson",
+        "width": 1440,
+        "check": "Owner reports still denied",
+        "pass": true
+      },
+      {
+        "role": "salesperson",
+        "width": 390,
+        "initialApiRequests": 0,
+        "check": "SSR results, no duplicate search request, no horizontal overflow",
+        "pass": true
+      },
+      {
+        "role": "salesperson",
+        "width": 390,
+        "check": "Inventory search uses Next.js navigation with no document reload",
+        "pass": true
+      },
+      {
+        "role": "salesperson",
+        "width": 390,
+        "check": "Owner reports still denied",
+        "pass": true
+      },
+      {
+        "role": "salesperson",
+        "check": "Medicine results present in server HTML with JavaScript disabled",
+        "pass": true
+      }
+    ]
+  },
+  "previewBenchmark": {
+    "status": "blocked",
+    "reason": "Vercel deployment-protection access; temporary preview-only protection exception rejected by automatic approval review. No region A/B result or production region recommendation."
+  }
+}

@@ -2,7 +2,7 @@ import { loadDispositionHistory } from "@/lib/stock-disposition-data";
 import { requireOwner } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { localDateISO } from "@/lib/utils";
-import { searchPattern, summarizeSupplier, supplierAlerts, type InventoryBatch, type InventoryMedicine, type PurchaseSummary, type Supplier, type SupplierDelivery, type SupplierInvoice } from "@/lib/supplier-profile";
+import { searchPattern, summarizeSupplier, supplierAlerts, type InventoryBatch, type InventoryMedicine, type PurchaseSummary, type Supplier, type SupplierDelivery, type SupplierInvoice, type SupplierSummary } from "@/lib/supplier-profile";
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 const PAGE_SIZE = 12;
@@ -40,6 +40,18 @@ async function loadAlerts(client: Client, lastPurchases: Record<string, string>)
   return supplierAlerts(medicines, batches, lastPurchases, Number(settings.expiry_alert_days));
 }
 
+async function loadSummary(client: Client, id: string, includeMedicines: boolean): Promise<SupplierSummary> {
+  const { data, error } = await client.rpc("supplier_purchase_summary", { p_supplier_id: id, p_include_medicines: includeMedicines });
+  if (!error && data) return data as SupplierSummary;
+  // Allow the application to ship before the additive RPC migration is approved.
+  // Only a missing function uses the legacy path; permission/DB errors must surface.
+  if (error?.code !== "PGRST202") throw new Error("Supplier records could not be loaded. Please try again.");
+  const rows = await allRows<PurchaseSummary>((from, to) => client.from("purchases")
+    .select("id,supplier_id,invoice_date,status,total,purchase_items(medicine_id)")
+    .eq("supplier_id", id).order("id").range(from, to));
+  return summarizeSupplier(id, rows);
+}
+
 export type ProfileOptions = { tab: string; query: string; page: number; status: string };
 export async function loadSupplierProfile(id: string, options: ProfileOptions) {
   // Keep this guard inside the loader: no financial query can run before authorization.
@@ -48,14 +60,13 @@ export async function loadSupplierProfile(id: string, options: ProfileOptions) {
   const { data, error } = await client.from("suppliers").select("id,name,contact_person,phone,email,address,tax_number,is_active,created_at").eq("id", id).maybeSingle();
   if (error) throw new Error("Supplier details could not be loaded. Please try again.");
   if (!data) return null;
-  const summaryRows = await allRows<PurchaseSummary>((from, to) => client.from("purchases")
-    .select("id,supplier_id,invoice_date,status,total,purchase_items(medicine_id)")
-    .eq("supplier_id", id).order("id").range(from, to));
-  const summary = summarizeSupplier(id, summaryRows);
+  const needsAlerts = ["overview", "alerts"].includes(options.tab);
+  const summaryRequest = loadSummary(client, id, needsAlerts);
   const limit = options.tab === "overview" ? 3 : PAGE_SIZE;
   const offset = options.tab === "overview" ? 0 : (options.page - 1) * limit;
-  const [alerts, invoices, deliveries, stockHistory] = await Promise.all([
-    ["overview", "alerts"].includes(options.tab) ? loadAlerts(client, summary.lastPurchases) : Promise.resolve([]),
+  const [summary, alerts, invoices, deliveries, stockHistory] = await Promise.all([
+    summaryRequest,
+    needsAlerts ? summaryRequest.then(summary => loadAlerts(client, summary.lastPurchases)) : Promise.resolve([]),
     (async () => {
       if (!["overview", "history"].includes(options.tab)) return { rows: [] as SupplierInvoice[], count: 0 };
       let request = client.from("purchases").select(`${invoiceFields},purchase_items(${itemFields})`, { count: "exact" }).eq("supplier_id", id);

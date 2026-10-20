@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { requireOwner, createClient, calls, fixture } = vi.hoisted(() => ({
-  requireOwner: vi.fn(), createClient: vi.fn(), calls: [] as { table: string; select: string; filters: [string, unknown][]; start: number; end: number }[],
+const { requireOwner, createClient, rpc, calls, fixture } = vi.hoisted(() => ({
+  requireOwner: vi.fn(), createClient: vi.fn(), rpc: vi.fn(), calls: [] as { table: string; select: string; filters: [string, unknown][]; start: number; end: number }[],
   fixture: { summaries: [] as Record<string, unknown>[], error: false },
 }));
 vi.mock("@/lib/auth", () => ({ requireOwner }));
@@ -13,7 +13,8 @@ const id = "supplier";
 beforeEach(() => {
   vi.resetAllMocks(); calls.length = 0; fixture.summaries = []; fixture.error = false;
   requireOwner.mockResolvedValue({ role: "owner" });
-  createClient.mockResolvedValue({ from: (table: string) => {
+  rpc.mockResolvedValue({ data: null, error: { code: "PGRST202" } });
+  createClient.mockResolvedValue({ rpc, from: (table: string) => {
     const call = { table, select: "", filters: [] as [string, unknown][], start: 0, end: 199 }; calls.push(call);
     const query = {
       select: (fields: string) => { call.select = fields; return query; },
@@ -33,6 +34,19 @@ beforeEach(() => {
 });
 
 describe("Owner-only supplier data loading", () => {
+  it("uses the summary RPC without downloading receipt history and keeps history paginated", async () => {
+    rpc.mockResolvedValue({ data: { total: 2050, deliveries: 205, medicineCount: 1, drafts: 1, lastPurchase: "2026-10-19", lastPurchases: {} }, error: null });
+    const result = await loadSupplierProfile(id, { ...options, tab: "history", page: 2 });
+    expect(result?.summary.total).toBe(2050);
+    expect(rpc).toHaveBeenCalledWith("supplier_purchase_summary", { p_supplier_id: id, p_include_medicines: false });
+    expect(calls.some(call => call.select.includes("purchase_items(medicine_id)"))).toBe(false);
+    expect(calls.find(call => call.table === "purchases")).toMatchObject({ start: 12, end: 23 });
+  });
+  it("does not mask RPC permission errors with a history scan", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "42501" } });
+    await expect(loadSupplierProfile(id, options)).rejects.toThrow("Supplier records could not be loaded");
+    expect(calls.some(call => call.select.includes("purchase_items(medicine_id)"))).toBe(false);
+  });
   it("checks authorization before accessing any financial records", async () => {
     requireOwner.mockRejectedValue(new Error("Owner required"));
     await expect(loadSupplierProfile(id, options)).rejects.toThrow("Owner required");

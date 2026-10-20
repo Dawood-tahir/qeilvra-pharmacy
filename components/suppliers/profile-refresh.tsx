@@ -9,16 +9,22 @@ export function ProfileRefresh() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const lastRefresh = useRef(0);
+  const refreshing = useRef(false);
+  useEffect(() => { refreshing.current = pending; }, [pending]);
   useEffect(() => {
+    lastRefresh.current = Date.now();
     const refresh = () => {
       const now = Date.now();
-      // Focus and visibilitychange often arrive together. Read current stock once.
-      if (document.visibilityState === "visible" && now - lastRefresh.current > 1000) { lastRefresh.current = now; router.refresh(); }
+      // Revalidate on return after a minute, rather than polling every open tab.
+      if (document.visibilityState === "visible" && !refreshing.current && now - lastRefresh.current >= 60_000) {
+        lastRefresh.current = now;
+        refreshing.current = true;
+        startTransition(() => router.refresh());
+      }
     };
-    const timer = setInterval(refresh, 30_000);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
-    return () => { clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, [router]);
-  return <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => startTransition(() => router.refresh())}><RefreshCw className={pending ? "animate-spin" : ""} />{pending ? "Refreshing..." : "Refresh"}</Button>;
+  return <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => { lastRefresh.current = Date.now(); refreshing.current = true; startTransition(() => router.refresh()); }}><RefreshCw className={pending ? "animate-spin" : ""} />{pending ? "Refreshing..." : "Refresh"}</Button>;
 }

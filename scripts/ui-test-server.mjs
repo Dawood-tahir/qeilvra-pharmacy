@@ -9,6 +9,7 @@ const server=await createServer({
   { find:"@/lib/auth",replacement:path.join(root,"tests/ui/auth.ts") },
   { find:"@/lib/supabase/server",replacement:path.join(root,"tests/ui/supabase.ts") },
   { find:"next/link",replacement:path.join(root,"tests/ui/link.tsx") },
+  { find:"next/form",replacement:path.join(root,"tests/ui/form.tsx") },
   { find:"next/navigation",replacement:path.join(root,"tests/ui/navigation.ts") },
   { find:"@",replacement:root },
  ] },

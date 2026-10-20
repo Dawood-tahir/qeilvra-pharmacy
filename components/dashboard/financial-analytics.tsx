@@ -23,8 +23,13 @@ export function FinancialAnalytics({ initialData, initialRange, reports = false 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const request = useRef<AbortController | null>(null);
+  const lastAutomaticRefresh = useRef(0);
   const currentRange = useRef(initialRange);
   async function load(next: FinanceRange, background = false) {
+    // Focus, online, visibility and the timer can fire together. Background
+    // refreshes must never cancel an in-flight period selection or another refresh.
+    if (background && (request.current || Date.now() - lastAutomaticRefresh.current < 1000)) return;
+    lastAutomaticRefresh.current = Date.now();
     currentRange.current = next;
     request.current?.abort();
     const controller = new AbortController(); request.current = controller;
@@ -41,7 +46,12 @@ export function FinancialAnalytics({ initialData, initialRange, reports = false 
       else { url.searchParams.delete("from"); url.searchParams.delete("to"); }
       history.replaceState(null, "", url);
     } catch (failure) { if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "Financial figures could not load. Please retry."); }
-    finally { if (!controller.signal.aborted) setLoading(false); }
+    finally {
+      if (request.current === controller) {
+        request.current = null;
+        setLoading(false);
+      }
+    }
   }
   const refresh = useRef(() => {});
   useEffect(() => {
