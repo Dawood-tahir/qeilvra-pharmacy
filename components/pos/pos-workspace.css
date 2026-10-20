@@ -1,94 +1,139 @@
-.pos-cart {
-  container: pos-cart / inline-size;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  min-width: 0;
+.pos-workspace { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 12px 12px 92px; }
+.pos-catalog {
+  container: pos-catalog / inline-size;
+  display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0;
+  border: 1px solid var(--glass-border); border-radius: 20px; padding: 12px; box-shadow: var(--glass-shadow);
 }
-
-.pos-cart-header { min-height: 52px; background-color: #f8fbff; }
-
-/* Depth belongs to the workspace edges. Medicines and cart rows stay opaque
-   so prices, units and quantities remain clear during fast daily sales. */
-.pos-medicine-card { transition: border-color 160ms ease, box-shadow 160ms ease; }
+.pos-medicines {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  align-content: start; align-items: start; gap: 10px; min-height: 0; margin-top: 14px; padding: 2px 2px 8px;
+}
+.pos-medicine-card { overflow-wrap: anywhere; background: #ffffffed; transition: border-color 160ms ease, box-shadow 160ms ease; }
+.pos-medicine-card h2 { font-size: 15px; line-height: 21px; text-wrap: pretty; }
 .pos-medicine-card:focus-within { border-color: #7daed4; box-shadow: 0 0 0 2px #dcebf6; }
-
+.pos-selling-units button { min-width: 60px; }
+.pos-medicine-actions > .pos-quantity { flex: 1; justify-content: space-between; }
+.pos-medicine-actions > .pos-quantity input { min-width: 0; width: 40px; }
+.pos-medicine-actions > .pos-quantity button { width: 36px; }
+.pos-medicine-actions > .q-button { flex: 1; min-width: 100px; }
+.pos-quantity { background: white; }
+.pos-quantity input { appearance: textfield; }
+.pos-quantity input::-webkit-inner-spin-button,
+.pos-quantity input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.pos-quantity button { border-radius: 10px; }
 @media (hover: hover) {
   .pos-medicine-card:hover { border-color: #a9c8df; box-shadow: 0 3px 10px #183d6110; }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .pos-medicine-card { transition: none; }
+.pos-cart-desktop { display: none; }
+.pos-cart-dialog { container: pos-frame / size; overflow: hidden; }
+html:has(.pos-cart-dialog[open]), body:has(.pos-cart-dialog[open]) { overflow: hidden; }
+.pos-cart {
+  container: pos-cart / inline-size;
+  display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0;
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; background: #ffffffb8;
 }
-
+.pos-cart-header { min-height: 56px; background: #f8fbfff5; }
+.pos-cart-header h2 { font-size: 19px; }
+/* The list takes all remaining space; the complete bill stays below it. */
 .pos-cart-items {
-  flex: 1 1 0;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: #fff;
+  flex: 1 1 0; min-height: 104px; overflow-y: auto; overscroll-behavior: contain;
+  background: #ffffffdf; scroll-padding-block: 8px;
 }
-
-.pos-cart-row { padding: 8px 12px; }
-.pos-cart-remove { width: 36px; height: 36px; }
-.pos-cart-quantity button { width: 36px; height: 36px; }
-.pos-cart-quantity input { height: 36px; width: 56px; font-size: 14px; appearance: textfield; }
-.pos-cart-quantity input::-webkit-inner-spin-button,
-.pos-cart-quantity input::-webkit-outer-spin-button { appearance: none; margin: 0; }
-
-.pos-billing-controls { display: grid; flex-shrink: 0; gap: 10px; }
-.pos-bill-extra { border-top: 1px solid #e2e8f0; padding-top: 10px; }
+.pos-cart-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; padding: 10px 14px; }
+.pos-cart-description { grid-column: 1; }
+.pos-cart-row > .pos-quantity { grid-column: 1; grid-row: 2; justify-self: start; }
+.pos-cart-line-price { grid-column: 2; grid-row: 1; }
+.pos-cart-remove { grid-column: 2; grid-row: 2; }
+.pos-cart-remove { width: 40px; height: 44px; }
+.pos-cart-quantity button { width: 40px; height: 44px; }
+.pos-cart-quantity input { height: 44px; width: 56px; font-size: 14px; }
+.pos-cart-line-price { font-variant-numeric: tabular-nums; }
+.pos-cart-summary {
+  flex-shrink: 0; display: grid; gap: 8px; border-top: 1px solid #d8e5f2;
+  padding: 12px 14px max(12px, env(safe-area-inset-bottom));
+  background: linear-gradient(145deg, #f7fbff, #edf5ff); overflow-wrap: anywhere; scroll-margin-block: 12px;
+}
+.pos-subtotal { min-height: 28px; }
+.pos-billing-controls { display: grid; gap: 8px; min-width: 0; }
+.pos-billing-details { min-width: 0; border: 1px solid #dce7f3; border-radius: 12px; background: #ffffffd9; }
+.pos-billing-details summary {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 10px;
+  border-radius: 11px; font-size: 14px; font-weight: 700; list-style: none;
+}
+.pos-billing-details summary::-webkit-details-marker { display: none; }
+.pos-billing-details summary:hover { background: #edf5ff; }
+.pos-adjustment-amount { min-width: 0; margin-left: auto; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; }
+.pos-billing-details[open] > summary { border-bottom: 1px solid #e2ebf5; border-radius: 11px 11px 0 0; }
+.pos-billing-details[open] > summary .pos-disclosure-chevron { transform: rotate(180deg); }
+.pos-disclosure-content { padding: 10px; }
+.pos-discount-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); align-items: end; gap: 8px; }
+.pos-discount-fields > * { margin: 0; }
 .pos-billing-input { height: 44px; min-height: 44px; }
-.pos-cart-summary { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
-.pos-cart-summary { background-color: #f1f6fc; }
-.pos-cart-dialog { overflow: hidden; }
-html:has(.pos-cart-dialog[open]),
-body:has(.pos-cart-dialog[open]) { overflow: hidden; }
-
-@container pos-cart (max-width: 280px) {
-  .pos-cart-quantity input { width: 44px; font-size: 12px; }
-  .pos-cart-row > div { flex-wrap: wrap; }
-  .pos-cart-line-price { order: 1; flex-basis: 100%; display: flex; justify-content: space-between; gap: 8px; text-align: left; }
+.pos-final-total { min-height: 42px; }
+.pos-print-controls { min-height: 44px; }
+@container pos-cart (max-width: 300px) {
+  .pos-cart-summary { padding-inline: 10px; }
+  .pos-cart-row { padding-inline: 10px; }
+  .pos-cart-quantity input { width: 48px; }
+  .pos-cart-quantity button { width: 36px; }
+  .pos-billing-details summary { gap: 6px; padding-inline: 8px; font-size: 13px; }
 }
-
-/* Use the cart's actual width, including when the sidebar or browser zoom changes. */
+@container pos-cart (min-width: 420px) {
+  .pos-cart-row { grid-template-columns: minmax(0, 1fr) auto minmax(48px, auto) 32px; gap: 8px; }
+  .pos-cart-description, .pos-cart-row > .pos-quantity, .pos-cart-line-price, .pos-cart-remove { grid-column: auto; grid-row: auto; }
+  .pos-cart-quantity button { width: 36px; }
+  .pos-cart-quantity input { width: 40px; }
+  .pos-cart-remove { width: 32px; }
+}
+@container pos-cart (min-width: 380px) {
+  .pos-extra-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 8px; }
+  .pos-extra-fields > * { margin: 0; }
+}
 @media (min-width: 640px) {
-  @container pos-cart (min-width: 380px) {
-    .pos-billing-controls { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
-    .pos-bill-extra { border-top: 0; border-left: 1px solid #e2e8f0; padding-top: 0; padding-left: 12px; }
+  .pos-workspace { padding: 16px 16px 92px; }
+  .pos-catalog { padding: 16px; }
+}
+@media (min-width: 1024px) {
+  .pos-workspace { flex-direction: row; height: calc(100dvh - 73px); min-height: 0; padding: 16px; overflow: hidden; }
+  .pos-catalog { overflow: hidden; }
+  .pos-medicines { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+  .pos-cart-desktop {
+    container: pos-frame / size;
+    display: block; flex: 0 0 clamp(360px, 30vw, 460px); min-width: 0; overflow: hidden;
+    border: 1px solid var(--glass-border); border-radius: 20px;
   }
 }
-
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .pos-workspace { gap: 12px; padding: 12px; }
+  .pos-catalog { padding: 12px; }
+}
+/* When zoom or expanded fields cannot fit, scroll the panel deliberately.
+   Keep medicines bounded so billing never sits behind twenty full rows. */
+@container pos-frame (max-height: 540px) {
+  .pos-cart { display: block; scroll-padding-block: 64px 16px; }
+  .pos-cart-header { position: sticky; top: 0; z-index: 2; }
+  .pos-cart-items { height: 140px; min-height: 104px; }
+}
+@container pos-frame ((max-height: 680px) and (max-width: 379px)) or ((max-height: 620px) and (min-width: 380px)) {
+  .pos-cart:has(.pos-billing-details[open]) { display: block; scroll-padding-block: 64px 16px; }
+  .pos-cart:has(.pos-billing-details[open]) .pos-cart-header { position: sticky; top: 0; z-index: 2; }
+  .pos-cart:has(.pos-billing-details[open]) .pos-cart-items { height: 140px; min-height: 104px; }
+}
+@container pos-frame ((max-height: 780px) and (max-width: 379px)) or ((max-height: 700px) and (min-width: 380px)) {
+  .pos-cart:has(.pos-bill-discount[open]):has(.pos-bill-extra[open]) { display: block; scroll-padding-block: 64px 16px; }
+  .pos-cart:has(.pos-bill-discount[open]):has(.pos-bill-extra[open]) .pos-cart-header { position: sticky; top: 0; z-index: 2; }
+  .pos-cart:has(.pos-bill-discount[open]):has(.pos-bill-extra[open]) .pos-cart-items { height: 140px; min-height: 104px; }
+}
 @media (pointer: coarse) {
-  .pos-cart-remove { width: 44px; height: 44px; }
-  .pos-cart-quantity button { width: 44px; height: 44px; }
+  .pos-medicines { grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); }
+  .pos-cart-remove, .pos-cart-quantity button { width: 44px; height: 44px; }
   .pos-cart-quantity input { height: 44px; font-size: 16px; }
-}
-
-/* A short window or magnified browser may not fit all fixed controls. In that
-   case use one outer scroll, with no nested medicine-list scrollbar. */
-@media (max-height: 700px) {
-  .pos-cart-dialog { overflow-y: auto; scroll-padding-block: 64px 272px; }
-  .pos-cart { height: auto; min-height: 100%; }
-  .pos-cart-items { flex: none; min-height: 88px; overflow: visible; }
-  .pos-cart-header { position: sticky; top: 0; z-index: 20; }
-  .pos-cart-summary { position: sticky; bottom: 0; z-index: 10; }
-
-  @media (min-width: 1024px) {
-    html:has(.pos-workspace) { scroll-padding-block: 128px 272px; }
-    .pos-workspace { height: auto; overflow: visible; align-items: flex-start; }
-    .pos-cart-desktop { overflow: visible; }
-    .pos-cart-desktop .pos-cart-header { top: 73px; }
-    .pos-catalog { height: max(280px, calc(100dvh - 105px)); }
+  .pos-medicine-actions > .pos-quantity button { width: 44px; }
+  @container pos-cart (min-width: 420px) {
+    .pos-cart-row { grid-template-columns: minmax(0, 1fr) auto minmax(48px, auto) 44px; }
   }
 }
-
-/* Below this height the header and summary cannot both remain pinned while
-   leaving enough room to operate an input. Keep every action reachable. */
-@media (max-height: 420px) {
-  .pos-cart .pos-cart-header,
-  .pos-cart .pos-cart-summary { position: static; }
-  .pos-cart-dialog,
-  html:has(.pos-workspace) { scroll-padding-block: 12px; }
+@media (prefers-reduced-motion: reduce) { .pos-medicine-card { transition: none; } }
+@media (prefers-reduced-transparency: reduce) {
+  .pos-cart, .pos-cart-items, .pos-cart-summary, .pos-billing-details, .pos-medicine-card { background: #fbfdff; }
 }

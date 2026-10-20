@@ -60,12 +60,15 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
   }, []);
   useEffect(() => {
     let active = true;
-    queueMicrotask(() => { if (active) { try { setCollapsed(localStorage.getItem("qeilvra-sidebar") === "collapsed"); } catch {} } });
     const desktop = window.matchMedia("(min-width: 1024px)");
-    const onResize = () => { if (desktop.matches) { setMobileOpen(false); setClosing(false); } };
+    const laptop = window.matchMedia("(min-width: 1024px) and (max-width: 1279px)");
+    const restoreSidebar = () => { if (active) { try { const saved = localStorage.getItem("qeilvra-sidebar"); setCollapsed(saved ? saved === "collapsed" : pathname === "/pos" && laptop.matches); } catch {} } };
+    queueMicrotask(restoreSidebar);
+    const onResize = () => { if (desktop.matches) { setMobileOpen(false); setClosing(false); } restoreSidebar(); };
     desktop.addEventListener("change", onResize);
-    return () => { active = false; desktop.removeEventListener("change", onResize); if (drawerTimer.current) clearTimeout(drawerTimer.current); };
-  }, []);
+    laptop.addEventListener("change", onResize);
+    return () => { active = false; desktop.removeEventListener("change", onResize); laptop.removeEventListener("change", onResize); if (drawerTimer.current) clearTimeout(drawerTimer.current); };
+  }, [pathname]);
   function toggleSidebar() {
     setCollapsed((value) => { try { localStorage.setItem("qeilvra-sidebar", value ? "expanded" : "collapsed"); } catch {} return !value; });
   }
@@ -124,8 +127,8 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
           </div>
         </header>
 
-        <div id="main-content" tabIndex={-1} className="min-h-[calc(100vh-4rem)] scroll-mt-20 pb-24 outline-none lg:pb-0">{children}</div>
-        <footer className="hidden border-t border-slate-200 bg-white px-8 py-5 text-xs text-slate-500 lg:flex lg:items-center lg:justify-between">
+        <div id="main-content" tabIndex={-1} className={cn("min-h-[calc(100vh-4rem)] scroll-mt-20 outline-none", pathname === "/pos" ? "pb-20 lg:min-h-0 lg:pb-0" : "pb-24 lg:pb-0")}>{children}</div>
+        <footer className={cn("hidden border-t border-slate-200 bg-white px-8 py-5 text-xs text-slate-500 lg:items-center lg:justify-between", pathname !== "/pos" && "lg:flex")}>
           <span>© {new Date().getFullYear()} Qeilvra. All rights reserved.</span><span>Pharmacy Management System</span>
         </footer>
       </div>
