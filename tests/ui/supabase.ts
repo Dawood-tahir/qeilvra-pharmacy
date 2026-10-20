@@ -15,7 +15,15 @@ class FixtureQuery {
   constructor(table: string) {
     const profile = location.pathname.startsWith("/suppliers/") || (location.pathname.startsWith("/purchases/") && ![purchase.id, "new"].includes(location.pathname.split("/").at(-1)!));
     this.rows = [...((profile ? supplierFixtureTables() : tables)[table] ?? [])];
-    if (table === "purchases" && ["/dashboard", "/reports"].includes(location.pathname)) this.rows = new URLSearchParams(location.search).has("empty") ? [] : [...this.rows, { ...purchase, id: "90000000-0000-4000-8000-000000000010", status: "posted", posted_at: new Date().toISOString() }];
+    if (table === "purchases" && ["/dashboard", "/reports"].includes(location.pathname)) {
+      // Receipts must predate the RPC snapshot, just as posted database records do.
+      // Keep the intentionally backdated supplier invoice separate from receipt day.
+      const posted_at = localDateISO() + "T00:00:00+05:00";
+      this.rows = new URLSearchParams(location.search).has("empty") ? [] : [...this.rows,
+        { ...purchase, id: "90000000-0000-4000-8000-000000000010", invoice_date: "2025-01-01", status: "posted", posted_at, total: 7500 },
+        { ...purchase, id: "90000000-0000-4000-8000-000000000011", status: "posted", posted_at, total: 5000 },
+      ];
+    }
     if (new URLSearchParams(location.search).has("stock")) this.rows = [...(stockFixtureTables()[table] ?? this.rows)];
     if (table === "suppliers" && new URLSearchParams(location.search).get("suppliers") === "none") this.rows = [];
   }

@@ -1,6 +1,34 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { financeRange } from "@/lib/financial-analytics";
 import { financialFixture } from "../ui/financial-data";
+import { formatCurrency } from "@/lib/utils";
+
+async function renderedTrend(page: Page, hourly: boolean) {
+  const trend = page.getByLabel("Revenue and Profit trend", { exact: true });
+  await expect(trend.locator("svg[role=application]")).toBeVisible();
+  await expect(trend.locator(".recharts-line")).toHaveCount(2);
+  // Recharts portals one-point dots outside the otherwise empty line groups.
+  const marks = trend.locator(".recharts-line-curve, .recharts-line-dot");
+  await expect.poll(() => marks.evaluateAll(elements => elements.filter(element => (element as SVGGeometryElement).getTotalLength() > 0).length)).toBe(2);
+  await expect(trend.locator(".recharts-legend-wrapper")).toContainText("Revenue");
+  await expect(trend.locator(".recharts-legend-wrapper")).toContainText("Gross Profit");
+  await expect(trend).toContainText(hourly ? "Hours in Asia/Karachi" : "Daily totals");
+  await trend.locator("svg[role=application]").scrollIntoViewIfNeeded();
+  // Target the final plotted bucket. A fixed offset from the SVG edge can
+  // select the previous day when a month is compressed onto a phone.
+  const lastPoint = await marks.evaluateAll(elements => {
+    const path = elements.find(element => (element as SVGGeometryElement).getTotalLength() > 0) as SVGGeometryElement;
+    const point = path.getPointAtLength(path.getTotalLength()).matrixTransform(path.getScreenCTM()!);
+    return { x: point.x, y: point.y };
+  });
+  await page.mouse.move(lastPoint.x, lastPoint.y);
+  const tooltip = trend.locator(".recharts-default-tooltip");
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText("Revenue");
+  await expect(tooltip).toContainText("Gross Profit");
+  await expect(tooltip).toContainText(formatCurrency(hourly ? 27500 : 47500));
+  await page.mouse.move(0, 0);
+}
 
 test("Owner switches Today, Monday-based week and month without reloading the page", async ({ page }) => {
   const requests: URL[] = [];
@@ -10,16 +38,27 @@ test("Owner switches Today, Monday-based week and month without reloading the pa
   });
   await page.goto("/dashboard?shell=1");
   await expect(page.getByRole("heading", { name: "Revenue and Profit trend" })).toBeVisible();
+  await expect(page.getByLabel("Financial totals")).toContainText("Today's Purchases");
+  await expect(page.getByLabel("Financial totals")).toContainText("12,500");
+  await renderedTrend(page, true);
   await expect(page.getByRole("button", { name: "Today", exact: true })).toHaveAttribute("aria-pressed", "true");
   for (const [label, period] of [["This Week", "week"], ["This Month", "month"], ["Today", "today"]]) {
     await page.getByRole("button", { name: label, exact: true }).click();
     await expect(page.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-pressed", "true");
     expect(requests.at(-1)?.searchParams.get("from")).toBe(financeRange(period).from);
     await expect(page).toHaveURL(new RegExp("period=" + period));
+    await renderedTrend(page, period === "today");
   }
   await expect(page.getByLabel("Financial totals")).toContainText("Net Operating Profit");
   await expect(page.getByLabel("Financial totals")).toContainText("2,500");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("a single-day report renders real point markers and usable tooltips", async ({ page }) => {
+  await page.goto("/reports?shell=1&from=2026-01-01&to=2026-01-01");
+  await renderedTrend(page, false);
+  const trend = page.getByLabel("Revenue and Profit trend", { exact: true });
+  await expect(trend.locator(".recharts-dot")).toHaveCount(2);
 });
 
 test("Reports show real response totals, negative profit, custom filters and aligned CSV links", async ({ page }) => {
@@ -29,7 +68,16 @@ test("Reports show real response totals, negative profit, custom filters and ali
   });
   await page.goto("/reports?shell=1");
   await expect(page.getByRole("heading", { name: "Financial summary", exact: true })).toBeVisible();
-  for (const heading of ["Expenses vs Profit", "Best-selling medicines", "Expense categories", "Daily sales summary"]) await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+  for (const heading of ["Expenses vs Profit", "Sales vs Purchases", "Best-selling medicines", "Expense categories", "Daily sales summary"]) await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+  for (const label of ["Expenses vs Profit comparison", "Sales vs Purchases comparison"]) {
+    const chart = page.getByLabel(label, { exact: true });
+    await expect(chart.locator("svg[role=application]")).toBeVisible();
+    await expect(chart.locator(".recharts-bar")).toHaveCount(2);
+    const bar = chart.locator(".recharts-bar").last().locator(".recharts-rectangle").last();
+    await bar.hover();
+    await expect(chart.locator(".recharts-default-tooltip")).toBeVisible();
+    if (label.startsWith("Sales")) await expect(chart.locator(".recharts-default-tooltip")).toContainText(formatCurrency(12500));
+  }
   await expect(page.getByText("Extra Charges Collected", { exact: true })).toBeVisible();
   await expect(page.getByText("Rent", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Custom dates", exact: true }).click();
@@ -37,22 +85,26 @@ test("Reports show real response totals, negative profit, custom filters and ali
   await page.getByRole("form", { name: "Date range" }).getByLabel("To", { exact: true }).fill("2026-01-31");
   await page.getByRole("button", { name: "Apply dates" }).click();
   await expect(page).toHaveURL(/from=2026-01-01&to=2026-01-31/);
-  await expect(page.getByRole("link", { name: "sales CSV", exact: true })).toHaveAttribute("href", /from=2026-01-01&to=2026-01-31/);
+  await expect(page.getByRole("link", { name: "Sales CSV", exact: true })).toHaveAttribute("href", /from=2026-01-01&to=2026-01-31/);
+  await renderedTrend(page, false);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `test-results/financial-reports-${test.info().project.name}.png`, fullPage: true });
 });
 
 test("loading failure keeps previous figures visible and Retry fetches updated transactions", async ({ page }) => {
   let calls = 0;
+  let releaseFailure!: () => void;
+  const pendingFailure = new Promise<void>(resolve => { releaseFailure = resolve; });
   await page.route("**/api/reports/analytics?**", async route => {
     calls++;
-    if (calls === 1) { await new Promise(resolve => setTimeout(resolve, 250)); return route.fulfill({ status: 503, json: { error: "Financial figures could not load." } }); }
+    if (calls === 1) { await pendingFailure; return route.fulfill({ status: 503, json: { error: "Financial figures could not load." } }); }
     const value = financialFixture(financeRange("week")); value.metrics.sales_count = 21;
     return route.fulfill({ json: value });
   });
   await page.goto("/dashboard?shell=1");
   await page.getByRole("button", { name: "This Week", exact: true }).click();
   await expect(page.getByText("Loading financial figures…", { exact: true })).toBeVisible();
+  releaseFailure();
   await expect(page.getByRole("alert")).toContainText("last loaded figures");
   await expect(page.getByLabel("Financial totals")).toContainText("47,500");
   await page.getByRole("button", { name: "Retry", exact: true }).click();

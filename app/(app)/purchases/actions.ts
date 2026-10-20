@@ -32,6 +32,6 @@ export async function postPurchaseAction(formData: FormData) {
   const { error } = await supabase.rpc("post_purchase", { p_purchase_id: id.data });
   if (error) return { ok: false, error: "Could not confirm stock posting. Check the purchase status before trying again." };
   revalidatePath("/suppliers/[id]", "page");
-  revalidatePath("/purchases"); revalidatePath(`/purchases/${id.data}`); revalidatePath("/stock"); revalidatePath("/dashboard"); revalidatePath("/medicines"); revalidatePath("/pos");
+  revalidatePath("/purchases"); revalidatePath(`/purchases/${id.data}`); revalidatePath("/stock"); revalidatePath("/dashboard"); revalidatePath("/reports"); revalidatePath("/medicines"); revalidatePath("/pos");
   return { ok: true, message: "Purchase posted. Stock is now available." };
 }

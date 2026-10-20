@@ -3,18 +3,19 @@ const { getUser, rpc, from, range, or } = vi.hoisted(() => ({ getUser: vi.fn(), 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser }, rpc, from }) }));
 import { GET } from "@/app/api/reports/export/route";
 const request = (query = "type=sales&from=2026-10-01&to=2026-10-19") => new Request("https://qeilvra.test/api/reports/export?" + query);
+const financialData = (data: Record<string, unknown>) => ({ from: "2026-10-01", to: "2026-10-19", generated_at: "2026-10-19T12:00:00Z", ...data });
 beforeEach(() => {
   vi.resetAllMocks();
   getUser.mockResolvedValue({ data: { user: { id: "owner" } }, error: null });
   rpc.mockResolvedValue({ data: "owner", error: null });
-  const query = { select: vi.fn().mockReturnThis(), gte: vi.fn().mockReturnThis(), lte: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), range, or };
+  const query = { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), gte: vi.fn().mockReturnThis(), lt: vi.fn().mockReturnThis(), lte: vi.fn().mockReturnThis(), gt: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(), range, or };
   or.mockReturnValue(query);
   from.mockReturnValue(query);
   range.mockResolvedValue({ data: [], count: 0, error: null });
 });
 describe("complete Owner CSV exports", () => {
   it("exports financial totals and daily rows from the same analytics calculation", async () => {
-    rpc.mockImplementation(async name => name === "current_role" ? { data: "owner" } : { data: { metrics: { sales_count: 1, gross_sales: 500, discounts: 50, refunds: 0, medicine_revenue: 450, extra_charge_revenue: 30, revenue: 480, cogs: 300, gross_profit: 180, expenses: 50, net_operating_profit: 130 }, daily: [] } });
+    rpc.mockImplementation(async name => name === "current_role" ? { data: "owner" } : { data: financialData({ metrics: { sales_count: 1, gross_sales: 500, discounts: 50, refunds: 0, medicine_revenue: 450, extra_charge_revenue: 30, revenue: 480, cogs: 300, gross_profit: 180, expenses: 50, net_operating_profit: 130 }, daily: [] }) });
     const response = await GET(request("type=financials&from=2026-10-01&to=2026-10-19"));
     expect(response.status).toBe(200); const text = await response.text();
     expect(text).toContain('"Net Operating Profit"'); expect(text).toContain('"TOTAL","1","500","50","0","450","30","480","300","180","50","130"');
@@ -23,11 +24,33 @@ describe("complete Owner CSV exports", () => {
   it("rejects reversed dates before querying the database", async () => { expect((await GET(request("type=sales&from=2026-10-19&to=2026-10-01"))).status).toBe(400); expect(from).not.toHaveBeenCalled(); });
   it("exports stock losses and confirmed supplier recoveries separately from customer revenue", async () => {
     const metrics = { sales_count: 1, gross_sales: 500, discounts: 50, refunds: 0, medicine_revenue: 450, extra_charge_revenue: 30, revenue: 480, cogs: 300, gross_profit: 180, expenses: 50, net_operating_profit: 106, stock_written_off: 14, supplier_returns_value: 30, supplier_recoveries: 12, supplier_replacements_value: 8, net_inventory_loss: 24 };
-    rpc.mockImplementation(async name => name === "current_role" ? { data: "owner" } : { data: { metrics, daily: [{ ...metrics, sale_date: "2026-10-19" }] } });
+    rpc.mockImplementation(async name => name === "current_role" ? { data: "owner" } : { data: financialData({ metrics, daily: [{ ...metrics, sale_date: "2026-10-19" }] }) });
     const csv = await (await GET(request("type=financials&from=2026-10-01&to=2026-10-19"))).text();
     expect(csv).toContain('"Confirmed Supplier Refunds/Credits","Replacement Stock Received","Net Inventory Loss"');
     expect(csv).toContain('"TOTAL","1","500","50","0","450","30","480","300","180","50","106","14","30","12","8","24"');
     expect(csv).toContain('"2026-10-19","1","500","50","0","450","30","480","300","180","50","106","14","30","12","8","24"');
+  });
+  it("exports posted receipt purchases separately without deducting them from financial results", async () => {
+    const metrics = { sales_count: 0, revenue: 0, gross_profit: 0, expenses: 0, net_operating_profit: 0 };
+    rpc.mockImplementation(async name => name === "current_role" ? { data: "owner" } : { data: financialData({ metrics, purchases_total: 9999, daily: [{ ...metrics, sale_date: "2026-10-19" }] }) });
+    range.mockResolvedValue({ data: [{ id: "1", posted_at: "2026-10-19T08:00:00Z", total: "12.34" }], count: 1, error: null });
+    const response = await GET(request("type=financials&from=2026-10-01&to=2026-10-19"));
+    const csv = await response.text();
+    expect(response.status).toBe(200);
+    expect(csv).toContain('"Net Inventory Loss","Purchases Received"');
+    expect(csv.trimEnd().split("\r\n").slice(1).every(row => row.endsWith(',"12.34"'))).toBe(true);
+    expect(csv).not.toContain("9999");
+    const query = from.mock.results[0].value;
+    expect(query.eq).toHaveBeenCalledWith("status", "posted");
+    expect(query.gte).toHaveBeenCalledWith("posted_at", "2026-10-01T00:00:00+05:00");
+  });
+  it("rejects a financial export when receipt completeness cannot be confirmed", async () => {
+    rpc.mockImplementation(async name => name === "current_role" ? { data: "owner" } : { data: financialData({ metrics: {}, daily: [] }) });
+    range.mockResolvedValue({ data: [], count: null, error: null });
+    const response = await GET(request("type=financials&from=2026-10-01&to=2026-10-19"));
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(await response.text()).toContain("Stock purchase figures could not load");
   });
   it("requires authentication", async () => { getUser.mockResolvedValue({ data: { user: null } }); expect((await GET(request())).status).toBe(401); expect(from).not.toHaveBeenCalled(); });
   it("does not expose purchase costs to Salespeople", async () => { rpc.mockResolvedValue({ data: "salesperson" }); expect((await GET(request("type=inventory&from=2026-10-01&to=2026-10-19"))).status).toBe(403); expect(from).not.toHaveBeenCalled(); });

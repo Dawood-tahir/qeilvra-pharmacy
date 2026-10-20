@@ -85,7 +85,7 @@ async function shortWindow(browser: Browser, baseURL: string | undefined, width:
   } finally { await context.close(); }
 }
 
-test("laptop and very short windows keep billing and checkout operable", async ({ browser, baseURL }, testInfo) => {
+for (const [width, height] of [[1366, 768], [1024, 450], [568, 320], [320, 568]]) test(`${width}x${height} windows keep billing and checkout operable`, async ({ browser, baseURL }, testInfo) => {
   test.skip(testInfo.project.name !== "width-1440", "Additional height cases run once.");
-  for (const [width, height] of [[1366, 768], [1024, 450], [568, 320], [320, 568]]) await shortWindow(browser, baseURL, width, height);
+  await shortWindow(browser, baseURL, width, height);
 });

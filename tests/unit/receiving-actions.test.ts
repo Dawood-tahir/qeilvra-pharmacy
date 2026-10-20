@@ -27,6 +27,8 @@ describe("existing Owner receiving operations", () => {
     expect(await receiveStockAction(id, stock, key)).toMatchObject({ ok: true, quantity: 100 });
     expect(rpc).toHaveBeenCalledExactlyOnceWith("receive_stock", { p_id: id, p_stock: stock, p_key: key });
     expect(from).not.toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
+    expect(revalidatePath).toHaveBeenCalledWith("/reports");
   });
   it("preserves the existing optional supplier behavior", async () => {
     expect(await receiveStockAction(id, { ...stock, supplier_id: "" }, key)).toMatchObject({ ok: true });
@@ -48,6 +50,18 @@ describe("existing Owner receiving operations", () => {
     expect(await saveGuidedMedicineAction(null, data, stock, key)).toMatchObject({ ok: true });
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(rpc).toHaveBeenCalledWith("save_guided_medicine", expect.objectContaining({ p_id: null, p_stock: stock, p_key: key }));
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
+    expect(revalidatePath).toHaveBeenCalledWith("/reports");
+  });
+  it("posting a saved purchase refreshes Dashboard and Reports only after success", async () => {
+    const form = new FormData(); form.set("id", id);
+    expect(await postPurchaseAction(form)).toMatchObject({ ok: true });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("post_purchase", { p_purchase_id: id });
+    expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
+    expect(revalidatePath).toHaveBeenCalledWith("/reports");
+    revalidatePath.mockClear(); rpc.mockResolvedValueOnce({ error: { code: "P0001" } });
+    expect(await postPurchaseAction(form)).toMatchObject({ ok: false });
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
   it("draft creation keeps purchased units and does not call posting", async () => {
     rpc.mockResolvedValue({ data: id, error: null });

@@ -20,6 +20,8 @@ export const tables: Record<string, Record<string, unknown>[]> = {
   suppliers, sales: [sale], purchases: [purchase], medicines: [{ ...medicine, medicine_units: medicine.units }],
   medicine_batches: [{ id: "batch", batch_number: "BATCH-1", expiry_date: "2098-12-25", quantity_on_hand: 200, purchase_cost: 2, is_quarantined: false, medicines: medicine, suppliers: suppliers[0] }],
   medicine_costs: [{ default_purchase_cost: 2 }],
+  medicine_units: medicine.units.map(unit => ({ ...unit, medicine_id: medicine.id })),
+  audit_logs: [{ id: "fixture-audit", action: "stock_received", entity_type: "medicine", entity_id: medicine.id, old_data: null, new_data: { quantity: 200 }, metadata: { reason: "Received supplier stock" }, created_at: sale.completed_at, profiles: { full_name: "Test Owner" } }],
   sale_returns: [
     { id: "return-request", return_number: "RET-TEST-1", status: "requested", reason: "Customer returned one sealed strip", requested_at: sale.completed_at, sales: sale, profiles: sale.profiles, return_items: [returnItem] },
     { id: "return-approved", return_number: "RET-TEST-2", status: "approved", reason: "Damaged packaging", refund_amount: 65, requested_at: sale.completed_at, sales: sale, profiles: sale.profiles, return_items: [returnItem] },

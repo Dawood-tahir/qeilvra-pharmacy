@@ -23,7 +23,7 @@ See [the audit](docs/INVENTORY-AUDIT.md) and [migration, backfill, and verificat
 - FEFO stock allocation with row locks; expired, quarantined, unavailable, and insufficient stock cannot be sold.
 - Draft purchases and atomic posting into batch inventory.
 - Owner-only stock correction with a mandatory reason and audit record.
-- Controlled return requests; only the Owner can approve a refund or restock saleable returns.
+- Audited direct POS returns for active Owners and Salespeople, including partial returns; historical return requests retain Owner review.
 - Expense tracking, operational reports, salesperson performance, and safe CSV exports.
 - Server-only Salesperson invitations and account deactivation.
 - Responsive medicine cards and transaction cards instead of compressed mobile tables.
@@ -31,9 +31,11 @@ See [the audit](docs/INVENTORY-AUDIT.md) and [migration, backfill, and verificat
 ## Financial definitions
 
 - **Revenue** = completed net sales after sale discounts, less approved refunds.
-- **Gross profit** = revenue less recorded FEFO cost of goods sold, adjusted for approved returned quantities.
+- **Gross profit** = revenue less recorded FEFO cost of goods sold, reversing returned medicine cost only when stock is received for resale.
 - **Net operating result** = gross profit less recorded operating expenses.
+- **Net Operating Profit** in Dashboard and Reports also subtracts net inventory losses after confirmed supplier recoveries and replacement stock. Supplier recoveries are separate from customer revenue.
 - Draft purchases do not affect inventory or COGS.
+- **Purchases received** counts posted purchase headers by receipt posting time within Asia/Karachi date boundaries, including recorded initial stock and restocks. It is separate from operating expenses. The purchase-invoice CSV uses invoice dates; the financial-summary CSV includes receipt-date purchases.
 
 Purchase cost defaults and actual batch costs are held separately from the salesperson-readable medicine catalogue. `sale_item_costs`, `medicine_costs`, `medicine_batches`, purchases, suppliers, expenses, settings, and audit logs are protected by Owner-only RLS.
 

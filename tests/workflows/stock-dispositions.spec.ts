@@ -3,6 +3,7 @@ import { purchase, suppliers } from "../ui/data";
 import { stockBatchId, stockReturnId } from "../ui/stock-data";
 import { financeRange } from "@/lib/financial-analytics";
 import { financialFixture } from "../ui/financial-data";
+import { formatCurrency } from "@/lib/utils";
 
 test("partial expired disposal previews batch cost and requires physical confirmation", async ({ page }) => {
   let submitted: Record<string, unknown> | undefined;
@@ -28,17 +29,15 @@ test("reports use returned stock cost and actual recoveries to reduce operating 
     const range = financeRange(new URL(route.request().url()).searchParams.get("period")!);
     const value = financialFixture(range);
     const inventory = { stock_written_off: 14, supplier_returns_value: 30, supplier_recoveries: 12, supplier_replacements_value: 8, net_inventory_loss: 24, net_operating_profit: -2524 };
-    Object.assign(value.metrics, inventory); Object.assign(value.daily[0], inventory);
+    Object.assign(value.metrics, inventory); Object.assign(value.daily.at(-1)!, inventory);
     await route.fulfill({ json: value });
   });
   await page.goto("/reports?shell=1");
   await page.getByRole("button", { name: "This Week", exact: true }).click();
   const inventory = page.getByLabel("Inventory loss totals");
-  for (const [label, amount] of [["Expired/Damaged Stock Written Off", "Rs 14"], ["Stock Value Returned to Suppliers", "Rs 30"], ["Confirmed Supplier Refunds/Credits", "Rs 12"], ["Net Inventory Loss", "Rs 24"]]) await expect(inventory.getByText(label, { exact: true }).locator("..")).toContainText(amount);
+  for (const [label, amount] of [["Expired/Damaged Stock Written Off", "Rs 14"], ["Stock Value Returned to Suppliers", "Rs 30"], ["Confirmed Supplier Refunds/Credits", "Rs 12"], ["Net Inventory Loss", "Rs 24"]]) await expect(inventory.locator(".q-card").filter({ has: page.getByText(label, { exact: true }) })).toContainText(amount);
   const totals = page.getByLabel("Financial totals");
-  await expect(totals.getByText("Net Operating Profit", { exact: true }).locator("..")).toContainText("2,524");
-  await expect(totals.getByText("Net Revenue", { exact: true }).locator("..")).toContainText("47,500");
-  await expect(totals.getByText("Operating Expenses", { exact: true }).locator("..")).toContainText("20,000");
+  for (const [label, amount] of [["This Week's Net Operating Profit", formatCurrency(-2524)], ["This Week's Sales", formatCurrency(47500)], ["This Week's Expenses", formatCurrency(20000)]]) await expect(totals.locator(".q-card").filter({ has: page.getByText(label, { exact: true }) })).toContainText(amount);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 

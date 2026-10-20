@@ -14,7 +14,7 @@ function safeError(message: string, code?: string) {
 }
 function refreshInventory() {
   revalidatePath("/suppliers/[id]", "page");
-  for (const path of ["/medicines", "/stock", "/purchases", "/dashboard", "/pos"]) revalidatePath(path);
+  for (const path of ["/medicines", "/stock", "/purchases", "/dashboard", "/reports", "/pos"]) revalidatePath(path);
 }
 export async function saveGuidedMedicineAction(id: string | null, input: unknown, stock: unknown, requestKey: string) {
   await requireOwner();

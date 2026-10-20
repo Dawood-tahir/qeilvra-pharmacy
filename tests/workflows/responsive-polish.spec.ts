@@ -5,12 +5,13 @@ import { financeRange } from "@/lib/financial-analytics";
 
 const screens = [
   ["dashboard", "/dashboard"], ["pos", "/pos"], ["inventory", "/medicines"],
+  ["medicine-detail", "/medicines/" + medicine.id], ["medicine-edit", "/medicines/" + medicine.id + "/edit"],
   ["new-medicine", "/medicines/new"], ["restock", "/medicines/restock"],
   ["purchases", "/purchases"], ["new-purchase", "/purchases/new"], ["purchase-detail", "/purchases/" + purchase.id],
   ["invoices", "/sales"], ["invoice-detail", "/sales/" + sale.id], ["returns", "/returns"],
   ["suppliers", "/suppliers"], ["supplier-detail", "/suppliers/" + suppliers[0].id],
   ["expenses", "/expenses"], ["reports", "/reports"], ["stock-history", "/stock?stock=1"],
-  ["users", "/users"], ["settings", "/settings"], ["alerts", "/alerts"], ["notifications", "/notifications"],
+  ["users", "/users"], ["settings", "/settings"], ["profile", "/profile"], ["audit", "/audit"], ["alerts", "/alerts"], ["notifications", "/notifications"],
 ] as const;
 
 async function fixtureApi(page: Page) {
@@ -24,22 +25,85 @@ async function fixtureApi(page: Page) {
 const address = (path: string) => path + (path.includes("?") ? "&" : "?") + "shell=1";
 const noOverflow = async (page: Page) => expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
-for (const [name, path] of screens) test(`${name} remains readable without page overflow`, async ({ page }, testInfo) => {
+function browserIssues(page: Page) {
   const errors: string[] = [];
   const network: string[] = [];
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
   page.on("response", response => { if (response.status() >= 400) network.push(`${response.status()} ${new URL(response.url()).pathname}`); });
+  page.on("requestfailed", request => {
+    // Navigating between fixture pages can cancel an in-flight background read.
+    if (!request.failure()?.errorText.includes("ERR_ABORTED")) network.push(`${request.failure()?.errorText} ${new URL(request.url()).pathname}`);
+  });
+  return { errors, network };
+}
+
+async function renderedCharts(page: Page, reports = false) {
+  const trend = page.getByLabel("Revenue and Profit trend", { exact: true });
+  await expect(trend.locator("svg[role='application']")).toBeVisible();
+  // A one-point series draws a dot; multiple points draw a curve. Both must
+  // contain actual geometry, rather than only an SVG or loading skeleton.
+  await expect(trend.locator(".recharts-line")).toHaveCount(2);
+  for (const chart of reports
+    ? [trend, page.getByLabel("Expenses vs Profit comparison", { exact: true }), page.getByLabel("Sales vs Purchases comparison", { exact: true })]
+    : [trend]) {
+    const wrapper = chart.locator(".recharts-wrapper");
+    await expect(wrapper.locator("svg[role='application']")).toBeVisible();
+    const size = await wrapper.evaluate(element => ({ width: element.clientWidth, height: element.clientHeight }));
+    const container = await chart.boundingBox();
+    expect(size.width).toBeGreaterThan(100);
+    expect(size.height).toBeGreaterThan(150);
+    expect(size.width).toBeLessThanOrEqual(container!.width);
+    const series = chart.locator(".recharts-line, .recharts-bar");
+    await expect(series).toHaveCount(2);
+    if (chart === trend) {
+      // One-point dots are portaled outside the line groups in Recharts.
+      await expect.poll(() => chart.locator(".recharts-line-curve, .recharts-line-dot").evaluateAll(elements => elements.filter(element => (element as SVGGeometryElement).getTotalLength() > 0).length)).toBe(2);
+      continue;
+    }
+    for (const seriesElement of await series.all()) {
+      await expect.poll(() => seriesElement.locator(".recharts-line-curve, .recharts-dot, .recharts-rectangle").evaluateAll(elements => elements.some(element => {
+        const bounds = element.getBoundingClientRect();
+        return bounds.width > 0 && bounds.height > 0;
+      }))).toBe(true);
+    }
+  }
+}
+
+async function medicineControlsFit(page: Page) {
+  const card = page.getByRole("article", { name: "Paracetamol 500mg", exact: true });
+  await expect(card.getByRole("button", { name: "Add to Cart", exact: true })).toBeVisible();
+  const controls = await card.locator("button").evaluateAll(buttons => buttons.map(button => {
+    const box = button.getBoundingClientRect(), style = getComputedStyle(button);
+    const range = document.createRange();
+    range.selectNodeContents(button);
+    const label = button.textContent?.trim();
+    const content = label ? range.getBoundingClientRect() : button.querySelector("svg")!.getBoundingClientRect();
+    return {
+      label: button.getAttribute("aria-label") ?? label,
+      left: content.left, right: content.right, width: content.width,
+      contentLeft: box.left + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.borderLeftWidth),
+      contentRight: box.right - Number.parseFloat(style.paddingRight) - Number.parseFloat(style.borderRightWidth),
+    };
+  }));
+  expect(controls.length).toBeGreaterThanOrEqual(6);
+  for (const control of controls) {
+    expect(control.width, `${control.label} rendered content`).toBeGreaterThan(0);
+    expect(control.left, `${control.label} fits inside left padding`).toBeGreaterThanOrEqual(control.contentLeft - 1);
+    expect(control.right, `${control.label} fits inside right padding`).toBeLessThanOrEqual(control.contentRight + 1);
+  }
+}
+
+for (const [name, path] of screens) test(`${name} remains readable without page overflow`, async ({ page }, testInfo) => {
+  const { errors, network } = browserIssues(page);
   await fixtureApi(page);
   await page.goto(address(path));
   await expect(page.locator("main").first()).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
   if (["dashboard", "reports"].includes(name)) {
-    // A heading or loading placeholder alone does not prove that a chart rendered.
-    await expect(page.locator(".recharts-wrapper svg").first()).toBeVisible();
-    await expect(page.locator(".recharts-wrapper").first()).toHaveJSProperty("clientWidth", expect.any(Number));
-    expect(await page.locator(".recharts-wrapper").first().evaluate(e => e.clientWidth)).toBeGreaterThan(100);
+    await renderedCharts(page, name === "reports");
   }
+  if (name === "pos") await medicineControlsFit(page);
   if (name === "inventory") await expect(page.getByText("Paracetamol 500mg", { exact: true }).filter({ visible: true }).first()).toBeVisible();
   const geometry = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }));
   expect(geometry.document, `${name} page overflow at ${geometry.viewport}px`).toBeLessThanOrEqual(geometry.viewport);
@@ -48,28 +112,80 @@ for (const [name, path] of screens) test(`${name} remains readable without page 
   expect(network, `${name} network failures`).toEqual([]);
 });
 
-test("short laptop and 200 percent layout retain important actions", async ({ browser, baseURL }, testInfo) => {
+const compactScreens = [
+  { label: "short-laptop", width: 1366, height: 768, zoom: 1 },
+  { label: "short-desktop", width: 1024, height: 600, zoom: 1 },
+  { label: "tablet-landscape", width: 1024, height: 768, zoom: 1 },
+  { label: "mobile-landscape", width: 844, height: 390, zoom: 1 },
+  { label: "zoom-125", width: 1440, height: 900, zoom: 1.25 },
+  { label: "zoom-150", width: 1440, height: 900, zoom: 1.5 },
+  { label: "zoom-200", width: 1440, height: 900, zoom: 2 },
+  { label: "small-zoom-200", width: 1024, height: 768, zoom: 2 },
+];
+
+for (const screen of compactScreens) for (const name of ["dashboard", "pos", "inventory", "new-purchase", "reports", "settings", "suppliers", "stock-history"]) test(`${screen.label} ${name} retains important actions`, async ({ browser, baseURL }, testInfo) => {
   test.skip(testInfo.project.name !== "width-1440", "Additional height and zoom cases run once.");
-  for (const [width, height, scale] of [[1366, 768, 1], [1024, 600, 1], [720, 450, 2], [512, 384, 2]]) {
-    const context = await browser.newContext({ baseURL, viewport: { width, height }, deviceScaleFactor: scale });
-    try {
-      const page = await context.newPage();
-      await fixtureApi(page);
-      for (const name of ["dashboard", "pos", "inventory", "new-purchase", "reports", "settings", "suppliers", "stock-history"]) {
-        const path = screens.find(screen => screen[0] === name)![1];
-        await page.goto(address(path));
-        await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
-        if (name === "pos") {
-          if (width < 1024) await page.getByRole("button", { name: /Cart & Checkout|View cart/ }).click();
-          const checkout = page.getByRole("button", { name: "Checkout", exact: true }).filter({ visible: true });
-          await checkout.scrollIntoViewIfNeeded();
-          await expect(checkout).toBeInViewport({ ratio: 1 });
-        }
-        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), name).toBe(true);
-        await page.screenshot({ path: `.private/polish/screens/${name}-${width}x${height}-scale${scale}.png`, fullPage: true });
-      }
-    } finally { await context.close(); }
-  }
+  // Browser zoom changes the effective CSS viewport and DPR together. DPR
+  // alone does not exercise layout zoom or responsive breakpoints.
+  const width = Math.floor(screen.width / screen.zoom), height = Math.floor(screen.height / screen.zoom);
+  const context = await browser.newContext({ baseURL, viewport: { width, height }, deviceScaleFactor: screen.zoom, hasTouch: screen.label.includes("landscape") });
+  try {
+    const page = await context.newPage();
+    const { errors, network } = browserIssues(page);
+    await fixtureApi(page);
+    if (name === "pos") await page.addInitScript(medicine => {
+      sessionStorage.setItem("qeilvra-cart-v2-fixture", JSON.stringify({
+        cart: Array.from({ length: 5 }, (_, index) => ({ ...medicine, id: "medicine-" + index, quantity: 1, unit: medicine.units[index % 3], lineKey: "medicine-" + index })),
+        discount: "0", discountMode: "fixed", extraAmount: "0", extraDescription: "",
+      }));
+    }, medicine);
+    const path = screens.find(screen => screen[0] === name)![1];
+    await page.goto(address(path));
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    if (name === "dashboard" || name === "reports") await renderedCharts(page, name === "reports");
+    if (name === "pos") {
+      await medicineControlsFit(page);
+      if (width < 1024) await page.getByRole("button", { name: /Cart & Checkout|View cart/ }).click();
+      const checkout = page.getByRole("button", { name: "Checkout", exact: true }).filter({ visible: true });
+      await expect(checkout).toBeEnabled();
+      await checkout.scrollIntoViewIfNeeded();
+      await expect(checkout).toBeInViewport({ ratio: 1 });
+      await checkout.click();
+      await expect(page.getByRole("dialog", { name: "Complete sale", exact: true })).toBeVisible();
+    }
+    if (name === "settings") {
+      const save = page.getByRole("button", { name: "Save settings", exact: true });
+      await save.scrollIntoViewIfNeeded();
+      await expect(save).toBeInViewport({ ratio: 1 });
+    }
+    await noOverflow(page);
+    await page.screenshot({ path: `.private/polish/screens/${name}-${screen.label}-${width}x${height}.png`, fullPage: true, scale: "css" });
+    expect(errors, `${screen.label} ${name} browser console`).toEqual([]);
+    expect(network, `${screen.label} ${name} network failures`).toEqual([]);
+  } finally { await context.close(); }
+});
+
+test("1536px medicine controls retain readable labels and quantity actions", async ({ browser, baseURL }, testInfo) => {
+  test.skip(testInfo.project.name !== "width-1440", "Additional desktop card-width case runs once.");
+  const context = await browser.newContext({ baseURL, viewport: { width: 1536, height: 900 } });
+  try {
+    const page = await context.newPage();
+    const { errors, network } = browserIssues(page);
+    await fixtureApi(page);
+    await page.goto("/pos?shell=1");
+    await medicineControlsFit(page);
+    const card = page.getByRole("article", { name: "Paracetamol 500mg", exact: true });
+    const quantity = card.getByRole("spinbutton", { name: "Quantity of Paracetamol tablet", exact: true });
+    await card.getByRole("button", { name: "Increase Quantity of Paracetamol tablet", exact: true }).click();
+    await expect(quantity).toHaveValue("2");
+    await card.getByRole("button", { name: "Decrease Quantity of Paracetamol tablet", exact: true }).click();
+    await expect(quantity).toHaveValue("1");
+    await card.getByRole("button", { name: "Add to Cart", exact: true }).click();
+    await expect(page.getByRole("complementary", { name: "Cart", exact: true }).getByRole("heading", { name: "Cart (1 item)", exact: true })).toBeVisible();
+    await noOverflow(page);
+    await page.screenshot({ path: ".private/polish/screens/pos-label-fit-1536.png", fullPage: true, scale: "css" });
+    expect(errors).toEqual([]); expect(network).toEqual([]);
+  } finally { await context.close(); }
 });
 
 test("reduced motion and transparency retain opaque readable surfaces", async ({ page, context }, testInfo) => {
@@ -78,11 +194,14 @@ test("reduced motion and transparency retain opaque readable surfaces", async ({
   await session.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }, { name: "prefers-reduced-transparency", value: "reduce" }] });
   await fixtureApi(page);
   await page.goto("/dashboard?shell=1");
-  await expect(page.locator(".recharts-wrapper svg").first()).toBeVisible();
+  await renderedCharts(page);
+  expect(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
   expect(await page.evaluate(() => matchMedia("(prefers-reduced-transparency: reduce)").matches)).toBe(true);
-  const surfaces = await page.locator(".q-glass-primary, .q-topbar").evaluateAll(elements => elements.map(element => ({ background: getComputedStyle(element).backgroundColor, blur: getComputedStyle(element).backdropFilter })));
+  const surfaces = await page.locator(".q-glass-primary, .q-glass-secondary, .q-topbar, .q-mobile-nav").evaluateAll(elements => elements.map(element => ({ background: getComputedStyle(element).backgroundColor, blur: getComputedStyle(element).backdropFilter })));
   expect(surfaces.length).toBeGreaterThan(0);
   for (const surface of surfaces) { expect(surface.blur).toBe("none"); expect(surface.background).not.toContain("rgba"); }
+  const sidebarTransition = await page.locator("#desktop-sidebar").evaluate(element => getComputedStyle(element).transitionDuration);
+  expect(sidebarTransition.split(",").every(duration => Number.parseFloat(duration) <= 0.01)).toBe(true);
   await page.keyboard.press("Tab");
   expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe("BODY");
   await noOverflow(page);
