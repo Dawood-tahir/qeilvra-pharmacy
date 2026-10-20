@@ -22,9 +22,8 @@ test("Inventory prices, inline discounts and extra charges reconcile at cash che
   let panel = await cart(page);
   await panel.getByText("Individual medicine discounts", { exact: true }).click();
   await panel.getByLabel("Paracetamol strip discount (Rs.)", { exact: true }).fill("15");
-  await panel.getByRole("group", { name: "Bill discount type", exact: true }).getByRole("button", { name: "Percentage (%)" }).click();
+  await panel.getByRole("combobox", { name: "Bill discount type", exact: true }).selectOption("percent");
   await panel.getByLabel("Bill discount (%)", { exact: true }).fill("10");
-  await panel.getByText("+ Extra Charges", { exact: true }).click();
   await panel.getByLabel("Description (optional)").fill("Delivery");
   await panel.getByLabel("Extra Amount (Rs.)").fill("30");
   await expect(panel).toContainText("192");
@@ -52,7 +51,6 @@ test("fixed discounts and extra charges can be edited and removed", async ({ pag
  await expect(panel).toContainText("5");
  await panel.getByRole("button",{name:"Remove bill discount",exact:true}).click();
  await expect(panel.getByLabel("Bill discount (Rs.)",{exact:true})).toHaveValue("0");
- await panel.getByText("+ Extra Charges",{exact:true}).click();
  await panel.getByLabel("Extra Amount (Rs.)").fill("3");
  await expect(panel).toContainText("10");
  await panel.getByRole("button",{name:"Remove extra charge",exact:true}).click();
