@@ -1,5 +1,5 @@
 import type { createClient } from "@/lib/supabase/server";
-import type { FinancialSnapshot } from "@/lib/financial-analytics";
+import { assertFinancialAmounts, type FinancialSnapshot } from "@/lib/financial-analytics";
 import { localDateISO } from "@/lib/utils";
 
 type Client = Awaited<ReturnType<typeof createClient>>;
@@ -8,6 +8,7 @@ type Receipt = { id: string; posted_at: string; total: number | string };
 // Call only after the Owner financial RPC succeeds. The session client also
 // enforces purchases_owner_manage RLS; no service key or transaction mutation.
 export async function withReceiptPurchases(client: Client, snapshot: FinancialSnapshot): Promise<FinancialSnapshot> {
+  assertFinancialAmounts(snapshot);
   const end = new Date(snapshot.to + "T00:00:00+05:00");
   end.setUTCDate(end.getUTCDate() + 1);
   const totals = new Map<string, bigint>();
@@ -39,7 +40,7 @@ export async function withReceiptPurchases(client: Client, snapshot: FinancialSn
     if (received >= (expected ?? 0)) break;
   }
   const amount = (value: bigint) => {
-    if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("Stock purchase total is too large to display accurately.");
+    if (value >= BigInt(2 ** 45) * 100n) throw new Error("Stock purchase total is too large to display accurately.");
     return Number(value) / 100;
   };
   return {

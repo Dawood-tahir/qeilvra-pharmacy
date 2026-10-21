@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { DateRangeFilter } from "@/components/ui/date-range-filter";
 import { Input } from "@/components/ui/input";
 import { requireOwner } from "@/lib/auth";
+import { financeRange } from "@/lib/financial-analytics";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate, localDateISO } from "@/lib/utils";
 
@@ -17,8 +18,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const params = await searchParams;
   const page = pageNumber(params.page);
   const today = localDateISO();
-  const start = new Date(`${today}T12:00:00+05:00`); start.setDate(1);
-  const from = params.from ?? localDateISO(start); const to = params.to ?? today;
+  const from = params.from ?? financeRange("month").from; const to = params.to ?? today;
   const supabase = await createClient();
   const [{ data: categories, error: categoryError }, { data: expenseRows, error: expenseError }, { data: selectedTotal, error: totalError }] = await Promise.all([
     supabase.from("expense_categories").select("id,name").eq("is_active", true).order("name"),

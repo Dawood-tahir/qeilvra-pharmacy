@@ -10,6 +10,18 @@ beforeEach(() => {
   createServerClient.mockReturnValue({ auth: { getClaims } });
 });
 describe("verified session proxy", () => {
+  it("lets only the exact scheduled archive route perform its own machine authentication", async () => {
+    getClaims.mockResolvedValue({ data: null, error: { message: "no session" } });
+    const response = await updateSession(new NextRequest("https://qeilvra.test/api/cron/invoice-archive"));
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(createServerClient).not.toHaveBeenCalled(); expect(getClaims).not.toHaveBeenCalled();
+  });
+  it.each(["/api/cron/invoice-archive/", "/api/cron/invoice-archive-other", "/api/cron/invoice-archive/nested", "/api/invoices/archive"])("retains session authentication on neighboring path %s", async path => {
+    getClaims.mockResolvedValue({ data: null, error: { message: "no session" } });
+    const response = await updateSession(new NextRequest("https://qeilvra.test" + path));
+    expect(response.status).toBe(401); expect(getClaims).toHaveBeenCalledTimes(1);
+  });
   it("allows the inactive sign-in error to render without a redirect loop", async () => {
     const response = await updateSession(new NextRequest("https://qeilvra.test/login?error=inactive"));
     expect(response.headers.get("location")).toBeNull();

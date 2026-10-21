@@ -9,6 +9,12 @@ describe("supplier purchase summaries", () => {
   it("handles suppliers with no transactions", () => {
     expect(summarizeSupplier("supplier", [])).toEqual({ total: 0, deliveries: 0, medicineCount: 0, drafts: 0, lastPurchase: null, lastPurchases: {} });
   });
+  it("fails explicitly instead of rounding an unsafe aggregate or hiding missing money", () => {
+    expect(() => summarizeSupplier("supplier", [receipt("bad", "2026-10-21", NaN)])).toThrow("verified");
+    const large = Array.from({ length: 100 }, (_, i) => receipt(String(i), "2026-10-21", 999999999999.99));
+    expect(() => summarizeSupplier("supplier", large)).toThrow("too large");
+    expect(summarizeSupplier("supplier", [receipt("a", "2026-10-21", 0.10), receipt("b", "2026-10-21", 0.20)]).total).toBe(0.30);
+  });
   it("counts posted invoices once, distinct medicines and dates without guessing suppliers", () => {
     const first = receipt("initial", "2026-09-01", 200.10);
     const result = summarizeSupplier("supplier", [first, receipt("restock", "2026-10-10", 150.20), receipt("purchase", "2026-10-01", 250, "posted", "supplier", ["medicine", "second"]), receipt("draft", "2026-10-18", 999, "draft", "supplier", ["draft-only"]), receipt("cancelled", "2026-10-19", 999, "cancelled"), receipt("unassigned", "2026-10-20", 999, "posted", null), receipt("other", "2026-10-20", 999, "posted", "other"), first]);

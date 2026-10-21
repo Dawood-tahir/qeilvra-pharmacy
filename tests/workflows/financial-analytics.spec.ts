@@ -3,6 +3,32 @@ import { financeRange } from "@/lib/financial-analytics";
 import { financialFixture } from "../ui/financial-data";
 import { formatCurrency } from "@/lib/utils";
 
+test("large purchases and negative profit retain unbroken readable amounts", async ({ page }) => {
+  await page.route("**/api/reports/analytics?**", route => {
+    const value = financialFixture(financeRange("month"));
+    Object.assign(value.metrics, { revenue: 35299, cogs: 7925001.83, gross_profit: -7889702.83, expenses: 123.01, net_operating_profit: -7889825.84 });
+    value.purchases_total = 1000309122;
+    value.trend = [{ bucket_start: value.to + "T00:00:00+05:00", sale_date: value.to, revenue: 35299, gross_profit: -7889702.83 }];
+    return route.fulfill({ json: value });
+  });
+  await page.goto("/dashboard?shell=1");
+  await page.getByRole("button", { name: "This Month", exact: true }).click();
+  const totals = page.getByLabel("Financial totals");
+  for (const amount of [1000309122, -7889702.83, -7889825.84]) {
+    const number = totals.getByText(formatCurrency(amount), { exact: true });
+    await expect(number).toBeVisible();
+    expect(await number.evaluate(element => {
+      const range = document.createRange(); range.selectNodeContents(element);
+      return { lines: range.getClientRects().length, fits: element.scrollWidth <= element.clientWidth + 1, nowrap: getComputedStyle(element).whiteSpace };
+    })).toEqual({ lines: 1, fits: true, nowrap: "nowrap" });
+  }
+  const trend = page.getByLabel("Revenue and Profit trend", { exact: true });
+  await expect(trend.locator("svg[role=application]")).toBeVisible();
+  await expect(trend).toContainText("M");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `test-results/financial-audit-large-${test.info().project.name}.png`, fullPage: true });
+});
+
 async function renderedTrend(page: Page, hourly: boolean) {
   const trend = page.getByLabel("Revenue and Profit trend", { exact: true });
   await expect(trend.locator("svg[role=application]")).toBeVisible();

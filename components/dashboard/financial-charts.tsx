@@ -4,7 +4,8 @@ import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ReferenceLine, R
 import { APP_TIMEZONE, formatCurrency, formatDate } from "@/lib/utils";
 import type { FinancialPoint, FinancialTrendPoint } from "@/lib/financial-analytics";
 
-const axisMoney = (value: number) => Math.abs(value) >= 1000 ? `${Number((value / 1000).toFixed(1))}k` : String(value);
+const compactMoney = new Intl.NumberFormat("en-PK", { notation: "compact", maximumFractionDigits: 1 });
+const axisMoney = (value: number) => compactMoney.format(value);
 const tooltipStyle = { borderRadius: 12, border: "1px solid #dbe5ee", background: "#ffffff", color: "#0f172a", fontSize: 12, maxWidth: 240, boxShadow: "0 8px 24px #0f274015" };
 const hourLabel = new Intl.DateTimeFormat("en-PK", { hour: "numeric", timeZone: APP_TIMEZONE });
 const hourTooltip = new Intl.DateTimeFormat("en-PK", { day: "numeric", month: "short", hour: "numeric", timeZone: APP_TIMEZONE });

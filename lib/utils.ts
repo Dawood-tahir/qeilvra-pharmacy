@@ -22,8 +22,9 @@ const isoFormatter = new Intl.DateTimeFormat("en-CA", {
 });
 
 export function formatCurrency(value: number | string | null | undefined) {
-  const numeric = Number(value ?? 0);
-  return currencyFormatter.format(Number.isFinite(numeric) ? numeric : 0).replace("PKR", "Rs.");
+  if (value == null || (typeof value === "string" && !value.trim())) return "Unavailable";
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && Math.abs(numeric) < 2 ** 45 ? currencyFormatter.format(numeric).replace("PKR", "Rs.") : "Unavailable";
 }
 
 export function formatDate(value: string | Date, options?: Intl.DateTimeFormatOptions) {

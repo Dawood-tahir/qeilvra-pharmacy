@@ -3,6 +3,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured, getPublicSupabaseEnv } from "@/lib/env";
 
 export async function updateSession(request: NextRequest) {
+  // Machine authentication is enforced by this exact route before admin access.
+  // All other API paths retain the existing staff session checks.
+  if (request.nextUrl.pathname === "/api/cron/invoice-archive") {
+    const response = NextResponse.next({ request });
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
+  }
   if (!isSupabaseConfigured) {
     const path = request.nextUrl.pathname;
     const publicPath = path.startsWith("/login") || path.startsWith("/forgot-password") || path.startsWith("/auth/") || path.startsWith("/_next") || path === "/favicon.ico";

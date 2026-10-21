@@ -34,3 +34,20 @@ export type FinancialSnapshot = {
   legacy_cost_estimates: number;
   inventory?: { total_medicines: number; low_stock_items: number; out_of_stock_items: number };
 };
+
+const moneyFields = ["gross_sales", "discounts", "refunds", "medicine_revenue", "extra_charge_revenue", "revenue", "cogs", "gross_profit", "expenses", "net_operating_profit", "stock_written_off", "supplier_returns_value", "supplier_recoveries", "supplier_replacements_value", "net_inventory_loss"] as const;
+// Keep a conservative margin below the IEEE-754 cent-precision boundary.
+// PostgreSQL keeps the exact ledger; refuse an unsafe numeric API response.
+export function assertFinancialAmounts(snapshot: FinancialSnapshot) {
+  const verify = (amount: unknown) => {
+    if (typeof amount !== "number" || !Number.isFinite(amount) || Math.abs(amount) >= 2 ** 45 || !/^-?\d+(?:\.\d{1,2})?$/.test(String(amount))) {
+      throw new Error("Financial amounts are missing or cannot be displayed accurately.");
+    }
+  };
+  for (const key of moneyFields) verify(snapshot.metrics[key]);
+  for (const point of [...snapshot.daily, ...snapshot.trend]) {
+    for (const key of moneyFields) if (key in point && point[key as keyof typeof point] != null) verify(point[key as keyof typeof point]);
+  }
+  for (const category of snapshot.expense_categories) verify(category.amount);
+  for (const person of snapshot.salespeople ?? []) verify(person.revenue);
+}

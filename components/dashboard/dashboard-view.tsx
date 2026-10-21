@@ -52,7 +52,7 @@ export function DashboardView({ role, name, metrics, financial, range, lowStock,
       {!owner && <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Key performance indicators">
         <>
 
-          <KpiCard title="My Sales Today" value={formatCurrency(metrics.today_sales)} helper={`${metrics.today_transactions ?? 0} transactions`} icon={ShoppingCart} tone="green" />
+          <KpiCard title="My Sales Today" value={formatCurrency(metrics.today_sales)} helper={`${metrics.today_transactions ?? 0} today's invoices, after their refunds`} icon={ShoppingCart} tone="green" />
           <KpiCard title="Low Stock" value={String(metrics.low_stock_items ?? 0)} helper="Items needing attention" icon={TriangleAlert} tone="orange" />
           <KpiCard title="Unavailable" value={String(metrics.out_of_stock_items ?? 0)} helper="Out of stock medicines" icon={Boxes} tone="red" />
           <KpiCard title="Quick Search" value="Medicines" helper="View prices, stock and expiry" icon={Pill} />

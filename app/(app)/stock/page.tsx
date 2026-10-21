@@ -23,7 +23,7 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
   const supplierFilter = z.uuid().safeParse(params.supplier);
   const purchaseFilter = z.uuid().safeParse(params.purchase);
   const supabase = await createClient();
-  let request = supabase.from("medicine_batches").select("id,supplier_id,batch_number,expiry_date,quantity_on_hand,purchase_cost,is_quarantined,medicines!inner(id,name,strength,sku,base_unit),suppliers(name),purchase_items(purchases(supplier_id,suppliers(name)))", { count: "exact" }).order("expiry_date").range((page - 1) * pageSize, page * pageSize - 1);
+  let request = supabase.from("medicine_batches").select("id,supplier_id,batch_number,expiry_date,quantity_on_hand,purchase_cost::text,is_quarantined,medicines!inner(id,name,strength,sku,base_unit),suppliers(name),purchase_items(purchases(supplier_id,suppliers(name)))", { count: "exact" }).order("expiry_date").range((page - 1) * pageSize, page * pageSize - 1);
   if (supplierFilter.success) request = request.eq("supplier_id", supplierFilter.data);
   if (params.medicine) request = request.eq("medicine_id", params.medicine);
   if (query) {
@@ -48,8 +48,8 @@ export default async function StockPage({ searchParams }: { searchParams: Promis
 })}</div></>}</CardContent></Card><div className="mt-4 flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-slate-500">{count ?? 0} batches · Page {page}</p><div className="flex gap-2"><Link href={pageHref(Math.max(1, page - 1))} className={buttonVariants({ variant: "outline", size: "sm", className: page === 1 ? "pointer-events-none opacity-50" : "" })}><ChevronLeft /> Previous</Link><Link href={pageHref(page + 1)} className={buttonVariants({ variant: "outline", size: "sm", className: batches.length < pageSize ? "pointer-events-none opacity-50" : "" })}>Next <ChevronRight /></Link></div></div><DispositionHistory history={history} /></main>;
 }
 
- type StockBatch = { id: string; supplier_id: string | null; batch_number: string; expiry_date: string; quantity_on_hand: number; purchase_cost: number; is_quarantined: boolean; medicines: { id: string; name: string; strength?: string; sku: string; base_unit: string }; suppliers: { name: string } | null; purchase_items?: { purchases: { supplier_id: string | null; suppliers: { name: string } | null } } | null };
+ type StockBatch = { id: string; supplier_id: string | null; batch_number: string; expiry_date: string; quantity_on_hand: number; purchase_cost: number | string; is_quarantined: boolean; medicines: { id: string; name: string; strength?: string; sku: string; base_unit: string }; suppliers: { name: string } | null; purchase_items?: { purchases: { supplier_id: string | null; suppliers: { name: string } | null } } | null };
 function BatchActions({ row, staffId, suppliers, expired }: { row: StockBatch; staffId: string; suppliers: { id: string; name: string }[]; expired: boolean }) {
  const origin=row.purchase_items?.purchases;
- return <StockActions staffId={staffId} batchId={row.id} medicine={row.medicines.name + " " + (row.medicines.strength ?? "")} batch={row.batch_number} quantity={Number(row.quantity_on_hand)} unit={row.medicines.base_unit} cost={Number(row.purchase_cost)} supplierId={row.supplier_id ?? origin?.supplier_id ?? null} supplierName={row.suppliers?.name ?? origin?.suppliers?.name} suppliers={suppliers} expired={expired} />;
+ return <StockActions staffId={staffId} batchId={row.id} medicine={row.medicines.name + " " + (row.medicines.strength ?? "")} batch={row.batch_number} quantity={Number(row.quantity_on_hand)} unit={row.medicines.base_unit} cost={row.purchase_cost} supplierId={row.supplier_id ?? origin?.supplier_id ?? null} supplierName={row.suppliers?.name ?? origin?.suppliers?.name} suppliers={suppliers} expired={expired} />;
 }

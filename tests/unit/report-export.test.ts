@@ -2,8 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { getUser, rpc, from, range, or } = vi.hoisted(() => ({ getUser: vi.fn(), rpc: vi.fn(), from: vi.fn(), range: vi.fn(), or: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser }, rpc, from }) }));
 import { GET } from "@/app/api/reports/export/route";
+import { financialFixture } from "../ui/financial-data";
 const request = (query = "type=sales&from=2026-10-01&to=2026-10-19") => new Request("https://qeilvra.test/api/reports/export?" + query);
-const financialData = (data: Record<string, unknown>) => ({ from: "2026-10-01", to: "2026-10-19", generated_at: "2026-10-19T12:00:00Z", ...data });
+const financialData = (data: Record<string, unknown>) => {
+  const empty = financialFixture({ period: "custom", from: "2026-10-01", to: "2026-10-19", granularity: "day" }, true);
+  return { ...empty, generated_at: "2026-10-19T12:00:00Z", ...data, metrics: { ...empty.metrics, ...(data.metrics as object) } };
+};
 beforeEach(() => {
   vi.resetAllMocks();
   getUser.mockResolvedValue({ data: { user: { id: "owner" } }, error: null });

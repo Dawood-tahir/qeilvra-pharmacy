@@ -1,4 +1,5 @@
 import { localDateISO } from "@/lib/utils";
+import { decimalCostMinor } from "@/lib/decimal-money";
 
 export type Supplier = {
   id: string; name: string; contact_person: string | null; phone: string | null;
@@ -18,13 +19,15 @@ export function summarizeSupplier(supplierId: string, purchases: PurchaseSummary
   // Purchase headers are the canonical receipts for all three receiving workflows.
   // Never infer supplier identity from the medicine or its current batches.
   const seen = new Set<string>();
-  let minorTotal = 0;
+  let minorTotal = 0n;
   for (const purchase of purchases) {
     if (purchase.supplier_id !== supplierId || seen.has(purchase.id)) continue;
     seen.add(purchase.id);
     if (purchase.status === "draft") result.drafts++;
     if (purchase.status !== "posted") continue;
-    minorTotal += Math.round(Number(purchase.total) * 100);
+    const minor = decimalCostMinor(purchase.total, 1);
+    if (minor == null) throw new Error("Supplier purchase total could not be verified.");
+    minorTotal += BigInt(minor);
     result.deliveries++;
     if (!result.lastPurchase || purchase.invoice_date > result.lastPurchase) result.lastPurchase = purchase.invoice_date;
     for (const item of purchase.purchase_items) {
@@ -32,7 +35,8 @@ export function summarizeSupplier(supplierId: string, purchases: PurchaseSummary
       if (!previous || purchase.invoice_date > previous) result.lastPurchases[item.medicine_id] = purchase.invoice_date;
     }
   }
-  result.total = minorTotal / 100;
+  if (minorTotal >= BigInt(2 ** 45) * 100n) throw new Error("Supplier purchase total is too large to display accurately.");
+  result.total = Number(minorTotal) / 100;
   result.medicineCount = Object.keys(result.lastPurchases).length;
   return result;
 }

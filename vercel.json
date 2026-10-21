@@ -1,0 +1,4 @@
+{
+  "git": { "deploymentEnabled": { "codex/financial-archive-audit": false } },
+  "crons": [{ "path": "/api/cron/invoice-archive", "schedule": "0 21 * * *" }]
+}

@@ -14,4 +14,16 @@ describe("audited stock actions", () => {
   it("preserves uncertain outcomes for safe retry", async () => { rpc.mockResolvedValue({ error: { code: "", message: "network" } }); expect(await disposeStockAction(input)).toMatchObject({ ok: false, uncertain: true }); rpc.mockResolvedValue({ error: { code: "P0001", message: "Stock changed." } }); expect(await disposeStockAction(input)).toMatchObject({ ok: false, uncertain: false, error: "Stock changed." }); });
   it("validates actual supplier recovery and real replacement details", async () => { const recovery = { key: input.key, dispositionId: input.batchId, method: "credit", amount: 12, reference: "Credit 123", confirmed: true, replacement: null }; expect(await confirmSupplierRecoveryAction(recovery)).toMatchObject({ ok: true }); expect(rpc).toHaveBeenCalledWith("confirm_supplier_recovery", expect.objectContaining({ p_amount: 12, p_method: "credit" })); rpc.mockClear(); expect(await confirmSupplierRecoveryAction({ ...recovery, method: "replacement" })).toMatchObject({ ok: false }); expect(rpc).not.toHaveBeenCalled(); });
   it("calculates cost previews in paisa from four-decimal batch cost", () => { expect(batchCostMinor(2, 7)).toBe(1400); expect(batchCostMinor(0.1255, 1)).toBe(13); expect(batchCostMinor(0.1255, 2)).toBe(25); });
+  it("preserves full recorded precision until the total is rounded", () => {
+    expect(batchCostMinor("0.11553273427471116816", 1000)).toBe(11553);
+    expect(batchCostMinor("2295.2625780389276533", 3360)).toBe(771208226);
+    expect(batchCostMinor("1e-7", 1000000)).toBe(10);
+    expect(batchCostMinor("0.005", 1)).toBe(1);
+    expect(batchCostMinor("1.23499999999999999", 1)).toBe(123);
+    expect(batchCostMinor(0, 100)).toBe(0);
+    expect(batchCostMinor("999999999999.99", 1)).toBe(99999999999999);
+    for (const invalid of ["NaN", "Infinity", "-1", "missing"]) expect(batchCostMinor(invalid, 1)).toBeNull();
+    expect(batchCostMinor("1", 0.5)).toBeNull();
+    expect(batchCostMinor("999999999999.99", 100000)).toBeNull();
+  });
 });

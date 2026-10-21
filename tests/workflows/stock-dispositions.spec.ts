@@ -5,6 +5,14 @@ import { financeRange } from "@/lib/financial-analytics";
 import { financialFixture } from "../ui/financial-data";
 import { formatCurrency } from "@/lib/utils";
 
+test("loss preview preserves decimal text on a half-paisa boundary", async ({ page }) => {
+  await page.goto("/stock?shell=1&stock=1&cost-precision=1");
+  await page.getByRole("button", { name: "Discard Stock", exact: true }).filter({ visible: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Discard Stock", exact: true });
+  await dialog.getByLabel("Quantity (tablets)", { exact: true }).fill("1");
+  await expect(dialog.getByText("Recorded batch cost:")).toContainText(formatCurrency(1.23));
+});
+
 test("partial expired disposal previews batch cost and requires physical confirmation", async ({ page }) => {
   let submitted: Record<string, unknown> | undefined;
   await page.route("**/__test/dispose-stock", async route => { submitted = route.request().postDataJSON(); await route.fulfill({ json: { ok: true, id: submitted!.key, quantity: 193, value: 14 } }); });

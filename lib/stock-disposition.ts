@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { decimalCostMinor } from "@/lib/decimal-money";
 
 export const recoveryMethod = z.enum(["credit", "refund", "replacement"]);
 export const dispositionSchema = z.object({
@@ -22,8 +23,4 @@ export type StockDisposition = {
   recovery_method: "refund" | "credit" | "replacement" | null; recovery_amount: number; confirmed_at: string | null; recovery_reference: string | null;
   replacement_purchase_id: string | null; suppliers?: { name: string } | null; actor?: { full_name: string } | null;
 };
-export function batchCostMinor(unitCost: number, quantity: number) {
-  if (!Number.isFinite(unitCost) || unitCost < 0 || !Number.isSafeInteger(quantity) || quantity < 0) return 0;
-  const [whole, fraction = ""] = unitCost.toFixed(4).split(".");
-  return Number((BigInt(whole + fraction) * BigInt(quantity) + 50n) / 100n);
-}
+export const batchCostMinor = decimalCostMinor;
