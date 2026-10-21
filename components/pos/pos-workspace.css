@@ -123,8 +123,9 @@ html:has(.pos-cart-dialog[open]), body:has(.pos-cart-dialog[open]) { overflow: h
   .pos-catalog { padding: 16px; }
 }
 @media (min-width: 1024px) {
-  .pos-workspace { flex-direction: row; height: calc(100dvh - 73px); min-height: 0; padding: 16px; overflow: hidden; }
-  .pos-catalog { overflow: hidden; }
+  /* Reserve room for real scrollbar gutters before adding another card slot. */
+  .pos-workspace { flex-direction: row; gap: 12px; height: calc(100dvh - 73px); min-height: 0; padding: 12px; overflow: hidden; }
+  .pos-catalog { padding: 12px; overflow: hidden; }
   .pos-medicines { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
   .pos-cart-desktop {
     container: pos-frame / size;
@@ -136,9 +137,14 @@ html:has(.pos-cart-dialog[open]), body:has(.pos-cart-dialog[open]) { overflow: h
 @media (min-width: 1280px) {
   .pos-cart-desktop { flex-basis: clamp(424px, 34%, 480px); }
 }
-@media (min-width: 1024px) and (max-width: 1279px) {
-  .pos-workspace { gap: 12px; padding: 12px; }
-  .pos-catalog { padding: 12px; }
+/* Reclaim space on short counters while keeping readable text, 44px action
+   targets and the cart's natural scrolling for expanded bills. */
+@container pos-frame (max-height: 600px) {
+  .pos-cart-header { min-height: 52px; }
+  .pos-cart-row { padding-block: 8px; }
+  .pos-cart-summary { gap: 6px; padding-block: 10px max(10px, env(safe-area-inset-bottom)); }
+  .pos-final-total { min-height: 36px; padding-top: 6px; }
+  .pos-checkout { height: 44px; }
 }
 @media (pointer: coarse) {
   .pos-medicines { grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr)); }

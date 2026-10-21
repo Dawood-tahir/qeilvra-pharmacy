@@ -20,8 +20,12 @@ async function openCatalog(page: Page) {
 async function gridGeometry(page: Page) {
   return page.locator(".pos-medicines").evaluate(grid => {
     const cards = [...grid.querySelectorAll(".pos-medicine-card")].map(card => card.getBoundingClientRect());
+    const style = getComputedStyle(grid);
     return {
       width: grid.getBoundingClientRect().width,
+      availableWidth: grid.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight),
+      gutter: (grid as HTMLElement).offsetWidth - grid.clientWidth,
+      gap: Number.parseFloat(style.columnGap),
       columns: cards.filter(card => Math.abs(card.top - cards[0].top) < 1).length,
       cardWidth: cards[0].width,
     };
@@ -119,4 +123,81 @@ test("medicine columns respond to sidebar space and desktop resizing", async ({ 
   expect(laptopExpanded.width).toBeLessThan(laptop.width);
   expect(laptopExpanded.columns).toBeLessThan(laptop.columns);
   await assertCardsFit(page);
+});
+
+async function classicScrollbar(page: Page) {
+  // Headless Chromium normally overlays its scrollbar. Reserving a stable
+  // gutter and overriding the existing thin width reproduces Windows layout.
+  await page.addStyleTag({ content: ".pos-medicines, .pos-cart-items { scrollbar-gutter: stable; scrollbar-width: auto; } .pos-medicines::-webkit-scrollbar, .pos-cart-items::-webkit-scrollbar { width: 17px; }" });
+  await expect.poll(async () => (await gridGeometry(page)).gutter, "The regression must consume real horizontal space for its scrollbar").toBeGreaterThanOrEqual(10);
+}
+
+async function comfortableColumns(page: Page, minimum: number) {
+  const grid = await gridGeometry(page);
+  expect(grid.gutter, "The classic scrollbar remains present after resizing").toBeGreaterThanOrEqual(10);
+  expect(grid.cardWidth, "Medicine controls retain their comfortable card width").toBeGreaterThanOrEqual(Math.min(minimum, grid.availableWidth) - 1);
+  const fittingColumns = Math.max(1, Math.floor((grid.availableWidth + grid.gap + 1) / (minimum + grid.gap)));
+  expect(grid.columns, "Use the number of comfortable cards that fit the measured catalog space").toBe(fittingColumns);
+  await assertCardsFit(page);
+  const cart = await page.locator(".pos-cart-items").evaluate(element => ({
+    gutter: (element as HTMLElement).offsetWidth - element.clientWidth,
+    scrolls: element.scrollHeight > element.clientHeight,
+    rows: [...element.querySelectorAll<HTMLElement>(".pos-cart-row")].map(row => {
+      const bounds = row.getBoundingClientRect();
+      return {
+        name: row.querySelector("h3")!.textContent,
+        overflow: row.scrollWidth > row.clientWidth + 1,
+        controlsFit: [...row.querySelectorAll("button, input")].every(control => {
+          const box = control.getBoundingClientRect();
+          return box.height >= 44 && box.left >= bounds.left - 1 && box.right <= bounds.right + 1;
+        }),
+      };
+    }),
+  }));
+  expect(cart.gutter, "Cart medicines also reserve a classic scrollbar gutter").toBeGreaterThanOrEqual(10);
+  expect(cart.scrolls).toBe(true);
+  expect(cart.rows).toHaveLength(medicines.length);
+  for (const row of cart.rows) {
+    expect(row.overflow, `${row.name} cart row does not overflow`).toBe(false);
+    expect(row.controlsFit, `${row.name} cart quantities and removal remain operable`).toBe(true);
+  }
+  return grid;
+}
+
+for (const pointer of [
+  { name: "desktop", width: 1280, minimum: 250, touch: false },
+  { name: "touch", width: 1366, minimum: 270, touch: true },
+]) test(`classic scrollbars preserve the ${pointer.name} medicine grid at 150% zoom-equivalent sizing`, async ({ browser, baseURL }, testInfo) => {
+  test.skip(testInfo.project.name !== "width-1440", "These two scrollbar and resize cases run once.");
+  const context = await browser.newContext({ baseURL, viewport: { width: pointer.width, height: 633 }, deviceScaleFactor: 1.5, hasTouch: pointer.touch });
+  try {
+    const page = await context.newPage();
+    await page.addInitScript(medicines => {
+      localStorage.setItem("qeilvra-sidebar", "expanded");
+      sessionStorage.setItem("qeilvra-cart-v2-fixture", JSON.stringify({
+        cart: medicines.map(item => ({ ...item, quantity: 1, unit: item.units[0], lineKey: item.id + ":base" })),
+        discount: "0", discountMode: "fixed", extraAmount: "0", extraDescription: "",
+      }));
+    }, medicines);
+    await openCatalog(page);
+    await classicScrollbar(page);
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(pointer.touch);
+    const expanded = await comfortableColumns(page, pointer.minimum);
+    // This specific desktop regression has room for two cards even after a
+    // classic gutter. Other widths use measured capacity rather than a fixed count.
+    expect(expanded.availableWidth).toBeGreaterThanOrEqual(pointer.minimum * 2 + expanded.gap);
+    expect(expanded.columns).toBeGreaterThanOrEqual(2);
+    await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+    await expect.poll(async () => Math.round((await page.locator("#desktop-sidebar").boundingBox())!.width)).toBe(80);
+    const collapsed = await comfortableColumns(page, pointer.minimum);
+    expect(collapsed.width).toBeGreaterThan(expanded.width);
+    expect(collapsed.columns).toBeGreaterThanOrEqual(expanded.columns);
+    for (const width of [1280, 1100, 1024]) {
+      await page.setViewportSize({ width, height: 633 });
+      await comfortableColumns(page, pointer.minimum);
+    }
+    await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
+    await expect.poll(async () => Math.round((await page.locator("#desktop-sidebar").boundingBox())!.width)).toBe(224);
+    await comfortableColumns(page, pointer.minimum);
+  } finally { await context.close(); }
 });
