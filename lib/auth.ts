@@ -2,8 +2,10 @@ import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { canManageOperations, isAppRole } from "@/lib/permissions";
+export type { AppRole } from "@/lib/permissions";
+import type { AppRole } from "@/lib/permissions";
 
-export type AppRole = "owner" | "salesperson";
 export type StaffUser = {
   id: string;
   email: string;
@@ -20,7 +22,7 @@ export const getCurrentStaff = cache(async (): Promise<StaffUser | null> => {
   const roles = profile?.user_roles as unknown as { role: string }[] | { role: string } | undefined;
   const role = Array.isArray(roles) ? roles[0]?.role : roles?.role;
 
-  if (!profile?.is_active || (role !== "owner" && role !== "salesperson")) return null;
+  if (!profile?.is_active || !isAppRole(role)) return null;
   return {
     id: user.id,
     email: user.email ?? "",
@@ -38,5 +40,11 @@ export async function requireStaff() {
 export async function requireOwner() {
   const staff = await requireStaff();
   if (staff.role !== "owner") redirect("/dashboard?error=forbidden");
+  return staff;
+}
+
+export async function requireOperationsManager() {
+  const staff = await requireStaff();
+  if (!canManageOperations(staff.role)) redirect("/dashboard?error=forbidden");
   return staff;
 }

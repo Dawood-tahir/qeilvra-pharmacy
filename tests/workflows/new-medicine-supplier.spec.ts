@@ -24,10 +24,9 @@ async function stock(page: Page) {
 async function prices(page: Page) {
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await expect(page.getByText("Step 3 of 3")).toBeVisible();
-  await page.getByRole("textbox", { name: /^Price of 1 Tablet/ }).fill("7");
-  await expect(page.getByRole("textbox", { name: /^Price of 1 Strip/ })).toHaveValue("70.00");
-  await page.getByRole("textbox", { name: /^Price of 1 Strip/ }).fill("65");
-  await page.getByRole("textbox", { name: /^Price of 1 Box/ }).fill("620");
+  await page.getByLabel(/^Price of 1 Box/).fill("620");
+  await expect(page.getByLabel(/^Price of 1 Strip/)).toHaveValue("62.00");
+  await expect(page.getByLabel(/^Price of 1 Tablet/)).toHaveValue("6.20");
 }
 async function selectSupplier(page: Page) {
   const picker = page.getByRole("combobox", { name: /Purchased From \(Supplier\)/ });
@@ -68,7 +67,7 @@ test("new medicine selects a saved supplier in Stock, reviews it, and saves only
   expect(requests[0].id).toBeNull();
   expect(requests[0].stock).toMatchObject({ supplier_id: suppliers[0].id, unit_key: "box", quantity: 2, batch_number: "NEW-SUPPLIER-BATCH", expiry_date: "2099-12-25", total_cost: "400" });
   expect(requests[0].data).not.toHaveProperty("supplier_id");
-  expect(requests[0].data).toMatchObject({ tablets_per_strip: 10, strips_per_box: 10, units: [{ unit_key: "base", selling_price: "7" }, { unit_key: "strip", selling_price: "65" }, { unit_key: "box", selling_price: "620" }] });
+  expect(requests[0].data).toMatchObject({ tablets_per_strip: 10, strips_per_box: 10, units: [{ unit_key: "base", selling_price: "6.20" }, { unit_key: "strip", selling_price: "62.00" }, { unit_key: "box", selling_price: "620" }] });
   await page.getByRole("button", { name: "Add Another Medicine", exact: true }).click();
   await page.getByLabel("Medicine Name").fill("Another supplier medicine");
   await page.getByRole("button", { name: "Next", exact: true }).click();
@@ -115,7 +114,7 @@ test("uncertain save retries the same supplier receipt and key with editing lock
   await page.getByRole("button", { name: "Save Medicine", exact: true }).click();
   await expect(page.getByRole("button", { name: "Retry Save", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Back", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("textbox", { name: /^Price of 1 Tablet/ })).toBeDisabled();
+  await expect(page.getByLabel(/^Price of 1 Tablet/)).toBeDisabled();
   await expect(page.getByRole("region", { name: "Medicine review" })).toContainText(suppliers[0].name);
   await page.getByRole("button", { name: "Retry Save", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Medicine added successfully." })).toBeVisible();

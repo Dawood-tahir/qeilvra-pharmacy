@@ -3,5 +3,5 @@ import path from "node:path";
 
 export default defineConfig({
   test: { environment: "jsdom", setupFiles: ["./tests/setup.ts"], exclude: ["tests/e2e/**", "tests/workflows/**", "node_modules/**"], coverage: { reporter: ["text", "html"] } },
-  resolve: { alias: { "@": path.resolve(import.meta.dirname, ".") } },
+  resolve: { alias: { "@": path.resolve(import.meta.dirname, "."), "server-only": path.resolve(import.meta.dirname, "tests/server-only.ts") } },
 });

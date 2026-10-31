@@ -1,8 +1,8 @@
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { StockDisposition } from "@/lib/stock-disposition";
 export async function loadDispositionHistory({ supplierId, purchaseId, medicineId, page = 1, stockPage = false }: { supplierId?: string; purchaseId?: string; medicineId?: string; page?: number; stockPage?: boolean }) {
-  const staff = await requireOwner(); const client = await createClient(); const size = stockPage ? 20 : 6;
+  const staff = await requireOperationsManager(); const client = await createClient(); const size = stockPage ? 20 : 6;
   let request = client.from("stock_dispositions").select("id,kind,medicine_id,medicine_name,batch_id,batch_number,quantity,base_unit,unit_cost,cost_value,reason,created_at,supplier_id,purchase_id,recovery_state,recovery_method,recovery_amount,confirmed_at,recovery_reference,replacement_purchase_id,suppliers(name),actor:profiles!stock_dispositions_created_by_fkey(full_name)").order("created_at", { ascending: false }).order("id", { ascending: false });
   if (supplierId) request = request.eq("supplier_id", supplierId);
   if (medicineId) request = request.eq("medicine_id", medicineId);

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireOwner, requireStaff } from "@/lib/auth";
+import { requireOperationsManager, requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { saveOutcomeUnknown } from "@/lib/save-result";
 import { completeReturnSchema } from "@/lib/instant-return";
@@ -35,7 +35,7 @@ export async function requestReturnAction(input: unknown) {
 }
 
 export async function reviewReturnAction(input: unknown) {
-  await requireOwner();
+  await requireOperationsManager();
   const parsed = z.object({ returnId: z.uuid(), approve: z.boolean(), notes: z.string().trim().max(500).default(""), paymentMethod: z.enum(["cash", "card"]).default("cash"), items: z.array(z.object({ return_item_id: z.uuid(), approved_quantity: z.coerce.number().int().min(0), restockable: z.boolean() })).default([]) }).safeParse(input);
   if (!parsed.success) return { ok: false as const, error: "Check the return review." };
   const supabase = await createClient();

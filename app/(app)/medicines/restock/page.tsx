@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { RestockForm } from "@/components/medicines/restock-form";
 import { Card, CardContent } from "@/components/ui/card";
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { StockMedicine } from "@/lib/medicine-units";
 export default async function RestockPage({ searchParams }: { searchParams: Promise<{ medicine?: string; supplier?: string }> }) {
-  await requireOwner();
+  await requireOperationsManager();
   const { medicine, supplier } = await searchParams;
   const supabase = await createClient();
   const { data: suppliers, error: supplierError } = await supabase.from("suppliers").select("id,name").eq("is_active", true).order("name");

@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 const medicine={id:"40000000-0000-0000-0000-000000000004",name:"Paracetamol",strength:"500mg",dosage_form:"Tablet",sku:"PC",base_unit:"tablet",selling_price:7,available_quantity:200,stock_status:"in_stock",packaging_status:"confirmed",units:[{unit_key:"base",label:"tablet",base_quantity:1,selling_price:7},{unit_key:"strip",label:"strip",base_quantity:10,selling_price:65},{unit_key:"box",label:"box",base_quantity:100,selling_price:620}]};
 async function search(page:Page,items:unknown[]=[medicine]) { await page.route("**/api/medicines/search?**",route=>route.fulfill({json:items})); }
 async function noOverflow(page:Page) { expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true); }
-test("beginner adds two boxes in three steps with independent prices",async({page})=>{
+test("beginner adds two boxes in three steps with box-derived prices",async({page})=>{
  await search(page,[]);
  let payload:Record<string,unknown>|undefined;
  await page.route("**/__test/save",async route=>{payload=route.request().postDataJSON();await route.fulfill({json:{ok:true,id:medicine.id,quantity:200}});});
@@ -20,16 +20,15 @@ test("beginner adds two boxes in three steps with independent prices",async({pag
  await page.getByLabel("Expiry date").fill("2027-12-25");
  await page.getByLabel("Total purchase cost").fill("400");
  await page.getByRole("button",{name:"Next",exact:true}).click();
- await page.getByRole("textbox",{name:/^Price of 1 Tablet/}).fill("7");
- await expect(page.getByRole("textbox",{name:/^Price of 1 Strip/})).toHaveValue("70.00");
- await page.getByRole("textbox",{name:/^Price of 1 Strip/}).fill("65");
- await page.getByRole("textbox",{name:/^Price of 1 Box/}).fill("620");
+  await page.getByLabel(/^Price of 1 Box/).fill("620");
+  await expect(page.getByLabel(/^Price of 1 Strip/)).toHaveValue("62.00");
+  await expect(page.getByLabel(/^Price of 1 Tablet/)).toHaveValue("6.20");
  await noOverflow(page);
  await page.screenshot({path:"test-results/wizard-"+test.info().project.name+".png",fullPage:true});
  await page.getByRole("button",{name:"Save Medicine",exact:true}).click();
  await expect(page.getByText("200 tablets are now available.")).toBeVisible();
  expect(payload?.stock).toMatchObject({quantity:2,unit_key:"box",batch_number:"A1"});
- expect(payload?.data).toMatchObject({tablets_per_strip:10,strips_per_box:10,units:[{unit_key:"base",selling_price:"7"},{unit_key:"strip",selling_price:"65"},{unit_key:"box",selling_price:"620"}]});
+ expect(payload?.data).toMatchObject({tablets_per_strip:10,strips_per_box:10,units:[{unit_key:"base",selling_price:"6.20"},{unit_key:"strip",selling_price:"62.00"},{unit_key:"box",selling_price:"620"}]});
 });
 test("duplicate check preserves entered identification",async({page})=>{
  await search(page);await page.goto("/?flow=new");

@@ -3,11 +3,11 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { MedicineForm } from "@/components/medicines/medicine-form";
 import { Card, CardContent } from "@/components/ui/card";
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function EditMedicinePage({ params }: { params: Promise<{ id: string }> }) {
-  await requireOwner();
+  await requireOperationsManager();
   const { id } = await params;
   const supabase = await createClient();
   const [{ data: medicine, error: medicineError }, { data: units, error: unitsError }] = await Promise.all([

@@ -14,11 +14,19 @@ The salesperson-readable `medicines` and `sale_items` tables contain no purchase
 
 `checkout_sale` locks all eligible batch rows in a deterministic medicine order, validates stock and server-side prices, consumes FEFO batches, inserts the sale/items/cost allocations/payment/movements/audit entry, and returns one result. Any exception rolls back the whole function.
 
-`post_purchase`, `adjust_stock`, and `complete_sale_return` use the same all-or-nothing database boundary. Active Owners and Salespeople complete authorized POS returns immediately. Historical sales are not deleted to simulate returns; the Owner-only review RPC remains for historical requests.
+`post_purchase`, `adjust_stock`, and `complete_sale_return` use the same all-or-nothing database boundary. Active Owners, Managers and Salespeople complete authorized POS returns immediately. Managers and Owners may handle any cashier's invoice; Salespeople remain scoped to their own invoices. Historical sales are not deleted to simulate returns; the operations review RPC remains for historical requests.
 
 ## Service key use
 
-The service key is required only for the one-time Owner bootstrap and Owner-authorized Salesperson Auth administration. Both are server-only modules. The public application never receives or serializes the secret key.
+The service key is required only for the one-time Owner bootstrap and Owner-authorized Manager/Salesperson Auth administration. Both are server-only modules. The public application never receives or serializes the secret key.
+
+## Manager permissions
+
+Migrations 019 and 020 add Manager without changing the strict `is_owner()` predicate. `can_manage_operations()` authorizes active Owners and Managers for stock, medicine, supplier, purchase, expense-entry and authorized return workflows. Owner financial RPCs, financial exports, archives, role administration, audit logs and settings updates remain Owner-only. Managers cannot promote themselves or another account through direct database writes.
+
+Manager dashboards contain only stock indicators and invoice identifiers, with no revenue/profit/expense summaries or invoice amount fields in the client payload. Supplier operational summaries omit spend totals; expense entry omits the selected-period total. Individual transaction amounts and purchasing costs remain visible where operational work requires them. Sold-cost and return-cost allocations remain Owner-only. This role hides financial summaries and reporting, rather than concealing every transaction amount.
+
+See [Manager role and rollout](MANAGER-ROLE.md) for the permission matrix, migration ordering, tests and production activation status.
 
 ## Operational controls
 

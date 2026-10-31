@@ -181,6 +181,8 @@ try {
     file(db, "tests/database/financial-analytics.sql");
     file(db, "supabase/migrations/202610190014_stock_dispositions.sql");
     file(db, "tests/database/stock-dispositions.sql");
+    const { verifyBoxPricingDatabase } = await import("./test-box-pricing.mjs");
+    await verifyBoxPricingDatabase(db, sql, quoteSql);
     // Also prove the financial fixes work on the hosted pre-ledger schema;
     // rolling this transaction back keeps the original upgrade tests meaningful.
     const standaloneAccuracy = fs.readFileSync("supabase/migrations/202610210018_financial_accuracy.sql", "utf8")
@@ -202,6 +204,12 @@ try {
     sql(db, "alter database " + db + " set qeilvra.test_accuracy_fixed='true';");
     file(db, "tests/database/financial-accuracy.sql");
     console.log("PASS: reproduced and corrected purchase money overflow, stale draft discount allocation and fractional batch loss rounding");
+    file(db, "supabase/migrations/202610250019_manager_role.sql");
+    file(db, "supabase/migrations/202610250020_manager_permissions.sql");
+    file(db, "tests/database/manager-permissions.sql");
+    file(db, "supabase/migrations/202610310021_supplier_city.sql");
+    file(db, "tests/database/supplier-information.sql");
+    console.log("PASS: Manager can operate stock, purchases, POS and cross-cashier refunds while financial/admin access stays Owner-only");
     // Reuse the independent financial oracle against actual line deletion. Only
     // its read source changes; expected amounts/costs/refunds remain literal.
     const ledgerOracle = fs.readFileSync("tests/database/archive-accounting-equivalence.sql", "utf8")
@@ -272,6 +280,19 @@ try {
       console.log("PASS: concurrent " + (sameKey ? "settlement retries confirm once" : "different settlement keys cannot duplicate recoveries"));
     }
   }
+  // The hosted database has no archive migrations yet. Verify the same additive
+  // Manager upgrade independently at that schema level, without enabling archives.
+  const managerDb = "qeilvra_manager_preledger_" + process.pid;
+  run("createdb", [...base, managerDb]); databases.push(managerDb);
+  file(managerDb, "tests/database/bootstrap.sql");
+  for (const migration of migrations.filter(name => name <= "202610190014_stock_dispositions.sql")) file(managerDb, "supabase/migrations/" + migration);
+  file(managerDb, "tests/database/contracts.sql");
+  file(managerDb, "supabase/migrations/202610250019_manager_role.sql");
+  file(managerDb, "supabase/migrations/202610250020_manager_permissions.sql");
+  file(managerDb, "tests/database/manager-permissions.sql");
+  file(managerDb, "supabase/migrations/202610310021_supplier_city.sql");
+  file(managerDb, "tests/database/supplier-information.sql");
+  console.log("PASS: Manager upgrade also works on the hosted pre-ledger schema without installing archive migrations");
   console.log("All local PostgreSQL migration, stock, financial and permission contracts passed.");
 } finally {
   for (const db of databases) run("dropdb", [...base, "--force", db]);

@@ -3,7 +3,7 @@ import { decimalCostMinor } from "@/lib/decimal-money";
 
 export type Supplier = {
   id: string; name: string; contact_person: string | null; phone: string | null;
-  email: string | null; address: string | null; tax_number: string | null;
+  email: string | null; address: string | null; city: string | null; tax_number: string | null;
   is_active: boolean; created_at: string;
 };
 export type PurchaseSummary = {

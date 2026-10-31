@@ -1,5 +1,5 @@
 import { loadDispositionHistory } from "@/lib/stock-disposition-data";
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { localDateISO } from "@/lib/utils";
 import { searchPattern, summarizeSupplier, supplierAlerts, type InventoryBatch, type InventoryMedicine, type PurchaseSummary, type Supplier, type SupplierDelivery, type SupplierInvoice, type SupplierSummary } from "@/lib/supplier-profile";
@@ -52,16 +52,23 @@ async function loadSummary(client: Client, id: string, includeMedicines: boolean
   return summarizeSupplier(id, rows);
 }
 
+async function loadOperationalSummary(client: Client, id: string, includeMedicines: boolean): Promise<Omit<SupplierSummary, "total">> {
+  const { data, error } = await client.rpc("supplier_operational_summary", { p_supplier_id: id, p_include_medicines: includeMedicines });
+  if (error || !data) throw new Error("Supplier operations could not be loaded. Please try again.");
+  const { deliveries, medicineCount, drafts, lastPurchase, lastPurchases } = data;
+  return { deliveries, medicineCount, drafts, lastPurchase, lastPurchases };
+}
+
 export type ProfileOptions = { tab: string; query: string; page: number; status: string };
 export async function loadSupplierProfile(id: string, options: ProfileOptions) {
   // Keep this guard inside the loader: no financial query can run before authorization.
-  await requireOwner();
+  const staff = await requireOperationsManager();
   const client = await createClient();
-  const { data, error } = await client.from("suppliers").select("id,name,contact_person,phone,email,address,tax_number,is_active,created_at").eq("id", id).maybeSingle();
+  const { data, error } = await client.from("suppliers").select("id,name,contact_person,phone,email,address,city,tax_number,is_active,created_at").eq("id", id).maybeSingle();
   if (error) throw new Error("Supplier details could not be loaded. Please try again.");
   if (!data) return null;
   const needsAlerts = ["overview", "alerts"].includes(options.tab);
-  const summaryRequest = loadSummary(client, id, needsAlerts);
+  const summaryRequest = staff.role === "owner" ? loadSummary(client, id, needsAlerts) : loadOperationalSummary(client, id, needsAlerts);
   const limit = options.tab === "overview" ? 3 : PAGE_SIZE;
   const offset = options.tab === "overview" ? 0 : (options.page - 1) * limit;
   const [summary, alerts, invoices, deliveries, stockHistory] = await Promise.all([

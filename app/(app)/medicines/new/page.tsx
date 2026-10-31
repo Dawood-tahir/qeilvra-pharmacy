@@ -2,12 +2,12 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { MedicineForm } from "@/components/medicines/medicine-form";
 import { Card, CardContent } from "@/components/ui/card";
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 
 export default async function NewMedicinePage() {
-  await requireOwner();
+  await requireOperationsManager();
   const supabase = await createClient();
   const { data: suppliers, error } = await supabase.from("suppliers").select("id,name").eq("is_active", true).order("name");
   if (error) throw new Error("Saved suppliers could not be loaded. Please try again.");

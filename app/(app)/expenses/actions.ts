@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { saveOutcomeUnknown } from "@/lib/save-result";
 
 export async function createExpenseAction(formData: FormData) {
-  const staff = await requireOwner();
+  const staff = await requireOperationsManager();
   const parsed = z.object({ category_id: z.uuid(), amount: z.coerce.number().positive().max(999999999999.99).multipleOf(0.01), expense_date: z.iso.date(), payee: z.string().trim().max(160).default(""), description: z.string().trim().min(2).max(500), payment_method: z.enum(["cash", "card"]), reference: z.string().trim().max(120).default("") }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: "Choose a category and enter the amount, date and description." };
   const supabase = await createClient();
@@ -18,7 +18,7 @@ export async function createExpenseAction(formData: FormData) {
 }
 
 export async function createExpenseCategoryAction(formData: FormData) {
-  await requireOwner();
+  await requireOperationsManager();
   const name = z.string().trim().min(2).max(80).safeParse(formData.get("name"));
   if (!name.success) return { ok: false, error: "Enter a category name with at least two letters." };
   const supabase = await createClient();

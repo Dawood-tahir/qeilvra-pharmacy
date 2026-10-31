@@ -236,7 +236,7 @@ test("date filters accept a different month in one apply", async ({ page }) => {
   await expect(page).toHaveURL(/from=2026-01-01&to=2026-01-31/);
 });
 
-for (const [flow, title] of [["dashboard", "Welcome back"], ["inventory", "Inventory"], ["purchase", "New purchase"], ["purchase-detail", "PUR-TEST-0001"], ["purchases", "Purchases"], ["suppliers", "Suppliers"], ["receipt", "Qeilvra Pharmacy"], ["returns", "Returns & refunds"], ["expenses", "Expenses"], ["reports", "Reports"], ["users", "Salespeople"], ["settings", "Settings"], ["alerts", "Stock alerts"], ["notifications", "Notifications"], ["stock", "Stock batches & corrections"]]) {
+for (const [flow, title] of [["dashboard", "Welcome back"], ["inventory", "Inventory"], ["purchase", "New purchase"], ["purchase-detail", "PUR-TEST-0001"], ["purchases", "Purchases"], ["suppliers", "Suppliers"], ["receipt", "Qeilvra Pharmacy"], ["returns", "Returns & refunds"], ["expenses", "Expenses"], ["reports", "Reports"], ["users", "Staff"], ["settings", "Settings"], ["alerts", "Stock alerts"], ["notifications", "Notifications"], ["stock", "Stock batches & corrections"]]) {
   test(flow + " is readable within the real desktop and mobile shell", async ({ page }) => {
     await mockMedicines(page);
     await page.goto("/?flow=" + flow + "&shell=1");

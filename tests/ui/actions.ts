@@ -9,9 +9,11 @@ export async function reviewReturnAction(data: unknown) { return submit("/__test
 export async function createExpenseAction(data: FormData) { return submit("/__test/expense", Object.fromEntries(data)); }
 export async function createExpenseCategoryAction(data: FormData) { return submit("/__test/category", Object.fromEntries(data)); }
 export async function createSupplierAction(data: FormData) { return submit("/__test/supplier", Object.fromEntries(data)); }
+export async function updateSupplierAction(id: string, values: unknown) { return submit("/__test/supplier-update", { id, values }); }
 export async function setSupplierActiveAction(data: FormData) { return submit("/__test/supplier-status", Object.fromEntries(data)); }
 export async function inviteSalespersonAction(data: FormData) { return submit("/__test/invite", Object.fromEntries(data)); }
 export async function setSalespersonActiveAction(data: FormData) { return submit("/__test/staff-status", Object.fromEntries(data)); }
+export async function setStaffRoleAction(data: FormData) { return submit("/__test/staff-role", Object.fromEntries(data)); }
 export async function saveSettingsAction(data: FormData) { return submit("/__test/settings", Object.fromEntries(data)); }
 export async function createMedicineCategoryAction(data: FormData) { return submit("/__test/medicine-category", Object.fromEntries(data)); }
 export async function correctStockAction(data: unknown) { return submit("/__test/correct-stock", data); }

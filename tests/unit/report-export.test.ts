@@ -57,7 +57,7 @@ describe("complete Owner CSV exports", () => {
     expect(await response.text()).toContain("Stock purchase figures could not load");
   });
   it("requires authentication", async () => { getUser.mockResolvedValue({ data: { user: null } }); expect((await GET(request())).status).toBe(401); expect(from).not.toHaveBeenCalled(); });
-  it("does not expose purchase costs to Salespeople", async () => { rpc.mockResolvedValue({ data: "salesperson" }); expect((await GET(request("type=inventory&from=2026-10-01&to=2026-10-19"))).status).toBe(403); expect(from).not.toHaveBeenCalled(); });
+  it.each(["salesperson", "manager"])("does not expose purchase costs or exports to %s", async role => { rpc.mockResolvedValue({ data: role }); expect((await GET(request("type=inventory&from=2026-10-01&to=2026-10-19"))).status).toBe(403); expect(from).not.toHaveBeenCalled(); });
   it("reports query failures instead of downloading an empty financial report", async () => { range.mockResolvedValue({ data: null, count: null, error: { message: "private SQL details" } }); const response = await GET(request()); expect(response.status).toBe(503); expect(await response.text()).not.toContain("private SQL"); });
   it("exports all rows even when the server caps each response below the requested page size", async () => {
     const rows = Array.from({ length: 1205 }, (_, id) => ({ id: String(id).padStart(12, "0"), completed_at: "2026-10-19T10:00:00+00:00", invoice_number: "QEI-" + id, net_total: 7, profiles: { full_name: id ? "Staff" : "  =1+1" } }));

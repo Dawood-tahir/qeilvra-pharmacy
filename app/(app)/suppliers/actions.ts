@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireOwner } from "@/lib/auth";
+import { getCurrentStaff, requireOperationsManager } from "@/lib/auth";
+import { canManageOperations } from "@/lib/permissions";
+import { supplierInformationErrors, supplierInformationSchema, type SupplierUpdateResult } from "@/lib/supplier-information";
 import { createClient } from "@/lib/supabase/server";
 import { saveOutcomeUnknown } from "@/lib/save-result";
 
@@ -13,7 +15,7 @@ const supplierSchema = z.object({
 });
 
 export async function createSupplierAction(formData: FormData) {
-  const staff = await requireOwner();
+  const staff = await requireOperationsManager();
   const parsed = supplierSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: "Enter a supplier name and check the contact details." };
   const supabase = await createClient();
@@ -24,7 +26,7 @@ export async function createSupplierAction(formData: FormData) {
 }
 
 export async function setSupplierActiveAction(formData: FormData) {
-  await requireOwner();
+  await requireOperationsManager();
   const parsed = z.object({ id: z.uuid(), active: z.enum(["true", "false"]) }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: "Select a saved supplier." };
   const supabase = await createClient();
@@ -33,4 +35,31 @@ export async function setSupplierActiveAction(formData: FormData) {
   revalidatePath(`/suppliers/${parsed.data.id}`);
   revalidatePath("/suppliers"); revalidatePath("/medicines/restock"); revalidatePath("/purchases/new");
   return { ok: true, message: parsed.data.active === "true" ? "Supplier reactivated." : "Supplier deactivated. Previous purchases are kept." };
+}
+
+export async function updateSupplierAction(id: string, values: unknown): Promise<SupplierUpdateResult> {
+  const staff = await getCurrentStaff();
+  if (!staff) return { ok: false, error: "Your session expired. Sign in again before saving supplier information." };
+  if (!canManageOperations(staff.role)) return { ok: false, error: "You do not have permission to edit suppliers." };
+  if (!z.uuid().safeParse(id).success) return { ok: false, error: "Select a saved supplier before editing." };
+  const parsed = supplierInformationSchema.safeParse(values);
+  if (!parsed.success) return { ok: false, error: "Check the highlighted supplier details.", fieldErrors: supplierInformationErrors(parsed.error) };
+
+  const supabase = await createClient();
+  // The schema allows only the seven information columns. The authenticated
+  // session and existing RLS remain authoritative; no service-role client is used.
+  const { data, error } = await supabase.from("suppliers").update(parsed.data).eq("id", id).select("id").maybeSingle();
+  if (error) return { ok: false, error: error.code === "42501" ? "You do not have permission to edit this supplier." : "Supplier information could not be updated. Your entries are kept. Please try again." };
+  if (!data) return { ok: false, error: "This supplier was not found or you no longer have permission to edit it." };
+
+  revalidatePath(`/suppliers/${id}`);
+  revalidatePath("/suppliers");
+  revalidatePath("/medicines/new");
+  revalidatePath("/medicines/restock");
+  revalidatePath("/medicines/[id]", "page");
+  revalidatePath("/stock");
+  revalidatePath("/purchases");
+  revalidatePath("/purchases/new");
+  revalidatePath("/purchases/[id]", "page");
+  return { ok: true };
 }

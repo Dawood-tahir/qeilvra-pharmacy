@@ -2,7 +2,7 @@ import { localDateISO } from "@/lib/utils";
 
 export const medicine = {
   id: "40000000-0000-4000-8000-000000000004", name: "Paracetamol", strength: "500mg", dosage_form: "Tablet", sku: "PC", barcode: "TEST-PC", base_unit: "tablet",
-  selling_price: 7, available_quantity: 200, stock_status: "in_stock", packaging_status: "confirmed", is_active: true, nearest_expiry: "2098-12-25", expiring_soon: true,
+  selling_price: 7, available_quantity: 200, stock_status: "in_stock", packaging_status: "confirmed", tablets_per_strip: 10, strips_per_box: 10, is_active: true, nearest_expiry: "2098-12-25", expiring_soon: true,
   units: [{ unit_key: "base", label: "tablet", base_quantity: 1, selling_price: 7 }, { unit_key: "strip", label: "strip", base_quantity: 10, selling_price: 65 }, { unit_key: "box", label: "box", base_quantity: 100, selling_price: 620 }],
 };
 export const suppliers = [
@@ -28,7 +28,7 @@ export const tables: Record<string, Record<string, unknown>[]> = {
   ],
   expense_categories: [{ id: "a0000000-0000-4000-8000-000000000001", name: "Utilities", is_active: true }],
   expenses: [{ id: "expense", amount: 3000, expense_date: localDateISO(), payee: "Electricity supplier", description: "Electricity bill", payment_method: "cash", expense_categories: { name: "Utilities" } }],
-  profiles: [{ id: "staff", full_name: "Test Salesperson", is_active: true, created_at: sale.completed_at }],
+  profiles: [{ id: "staff", full_name: "Test Salesperson", is_active: true, created_at: sale.completed_at, user_roles: { role: "salesperson" } }],
   pharmacy_settings: [{ id: true, pharmacy_name: "Qeilvra Pharmacy", expiry_alert_days: 90, salesperson_max_discount_percent: 5, receipt_footer: "Thank you for shopping with us." }],
   medicine_categories: [{ id: "category", name: "General", is_active: true }],
   notifications: [{ id: "notification", title: "Low stock", message: "Open Inventory to check Paracetamol stock.", severity: "warning", action_url: "/medicines", created_at: sale.completed_at }],

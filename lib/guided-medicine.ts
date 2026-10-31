@@ -15,6 +15,7 @@ export const guidedMedicineSchema = z.object({
   reorder_level: z.number().int().nonnegative().max(999999999).default(10),
   tablets_per_strip: z.number().int().positive().max(999999999).nullable(), strips_per_box: z.number().int().positive().max(999999999).nullable(),
   confirm_existing: z.boolean().default(false), is_active: z.boolean().default(true),
+  pricing_mode: z.enum(["box", "preserve"]).optional(),
   units: z.array(z.object({ unit_key: z.enum(["base", "strip", "box"]), selling_price: moneyInput.refine((p) => Number(p) > 0, "Enter a selling price greater than zero."), max_price: moneyInput.nullable() })).min(1).max(3),
 }).superRefine((data, ctx) => {
   const fail = (message: string) => ctx.addIssue({ code: "custom", message, path: ["units"] });

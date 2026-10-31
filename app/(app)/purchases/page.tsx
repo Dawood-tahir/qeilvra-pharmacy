@@ -6,13 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export default async function PurchasesPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<{ page?: string }> } = {}) {
   const page = pageNumber((await searchParams).page);
-  await requireOwner();
+  await requireOperationsManager();
   const supabase = await createClient();
   const { data, error } = await supabase.from("purchases").select("id,purchase_number,supplier_invoice_number,invoice_date,status,total,created_at,suppliers(name),purchase_items(count)").order("created_at", { ascending: false }).order("id", { ascending: false }).range((page - 1) * HISTORY_PAGE_SIZE, page * HISTORY_PAGE_SIZE);
   if (error) throw new Error("Purchases could not be loaded. Please try again.");

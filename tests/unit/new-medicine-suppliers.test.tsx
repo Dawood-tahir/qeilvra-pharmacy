@@ -1,17 +1,17 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { requireOwner, createClient, select, eq, order, renderForm } = vi.hoisted(() => ({
-  requireOwner: vi.fn(), createClient: vi.fn(), select: vi.fn(), eq: vi.fn(), order: vi.fn(), renderForm: vi.fn(),
+const { requireOperationsManager, createClient, select, eq, order, renderForm } = vi.hoisted(() => ({
+  requireOperationsManager: vi.fn(), createClient: vi.fn(), select: vi.fn(), eq: vi.fn(), order: vi.fn(), renderForm: vi.fn(),
 }));
-vi.mock("@/lib/auth", () => ({ requireOwner }));
+vi.mock("@/lib/auth", () => ({ requireOperationsManager }));
 vi.mock("@/lib/supabase/server", () => ({ createClient }));
 vi.mock("@/components/medicines/medicine-form", () => ({ MedicineForm: (props: unknown) => { renderForm(props); return null; } }));
 import NewMedicinePage from "@/app/(app)/medicines/new/page";
 
 beforeEach(() => {
   vi.resetAllMocks();
-  requireOwner.mockResolvedValue({ role: "owner" });
+  requireOperationsManager.mockResolvedValue({ role: "owner" });
   select.mockReturnValue({ eq }); eq.mockReturnValue({ order });
   createClient.mockResolvedValue({ from: (table: string) => { expect(table).toBe("suppliers"); return { select }; } });
 });
@@ -38,7 +38,7 @@ describe("saved suppliers on Add New Medicine", () => {
     expect(renderForm).not.toHaveBeenCalled();
   });
   it("checks Owner permission before reading saved suppliers", async () => {
-    requireOwner.mockRejectedValue(new Error("Owner required"));
+    requireOperationsManager.mockRejectedValue(new Error("Owner required"));
     await expect(NewMedicinePage()).rejects.toThrow("Owner required");
     expect(createClient).not.toHaveBeenCalled();
   });

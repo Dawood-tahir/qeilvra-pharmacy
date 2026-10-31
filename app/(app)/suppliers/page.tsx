@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Pagination } from "@/components/ui/pagination";
 import { HISTORY_PAGE_SIZE, pageNumber } from "@/lib/pagination";
 
 export default async function SuppliersPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
-  await requireOwner();
+  await requireOperationsManager();
   const supabase = await createClient();
   const params = await searchParams;
   const query = (params.q ?? "").trim().slice(0, 100);

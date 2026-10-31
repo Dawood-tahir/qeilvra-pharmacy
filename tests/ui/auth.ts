@@ -1,2 +1,3 @@
-export async function requireStaff() { return {id:"fixture",fullName:"Test Owner",email:"fixture@example.test",role:new URLSearchParams(location.search).get("role")==="salesperson"?"salesperson":"owner"}; }
+export async function requireStaff() { const value=new URLSearchParams(location.search).get("role"); const role=value==="manager"?"manager":value==="salesperson"?"salesperson":"owner"; return {id:"fixture",fullName:role==="manager"?"Test Manager":"Test Owner",email:"fixture@example.test",role}; }
 export const requireOwner=requireStaff;
+export const requireOperationsManager=requireStaff;

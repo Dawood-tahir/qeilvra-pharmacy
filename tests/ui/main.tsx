@@ -34,7 +34,7 @@ const params = new URLSearchParams(location.search);
 const searchParams = Promise.resolve(Object.fromEntries(params));
 const routeFlows: Record<string, string> = { "/medicines": "inventory", "/medicines/new": "new", "/medicines/restock": "restock-page", "/pos": "pos", "/dashboard": "dashboard", "/sales": "sales", "/purchases": "purchases", "/purchases/new": "purchase", "/returns": "returns", "/suppliers": "suppliers", "/expenses": "expenses", "/reports": "reports", "/settings": "settings", "/users": "users", "/alerts": "alerts", "/notifications": "notifications", "/stock": "stock" };
 const flow = routeFlows[location.pathname] ?? (location.pathname === "/profile" ? "profile" : location.pathname === "/audit" ? "audit" : location.pathname.startsWith("/medicines/") ? location.pathname.endsWith("/edit") ? "medicine-edit" : "medicine-detail" : location.pathname.startsWith("/suppliers/") ? "supplier-profile" : location.pathname.startsWith("/sales/") ? "receipt" : location.pathname.startsWith("/purchases/") ? "purchase-detail" : params.get("flow"));
-const role = params.get("role") === "salesperson" ? "salesperson" as const : "owner" as const;
+const role = params.get("role") === "manager" ? "manager" as const : params.get("role") === "salesperson" ? "salesperson" as const : "owner" as const;
 let screen;
 switch (flow) {
   case "new": screen = await NewMedicinePage(); break;

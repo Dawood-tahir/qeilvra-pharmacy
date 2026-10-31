@@ -40,6 +40,7 @@ class FixtureQuery {
   order(key: string, options?: { ascending?: boolean }) { this.orders.push({ key, ascending: options?.ascending !== false }); return this; }
   limit(limit: number) { this.end = limit - 1; return this; }
   range(start: number, end: number) { this.start = start; this.end = end; return this; }
+  overrideTypes() { return this; }
   or(filter: string, options?: { referencedTable?: string }) {
     this.rows = this.rows.filter((row) => filter.split(",").some((part) => {
       const [key, , pattern] = part.split(".");
@@ -58,6 +59,8 @@ export async function createClient() {
   return {
     from: (table: string) => new FixtureQuery(table),
     rpc: async (name: string, args: Record<string, unknown> = {}) => {
+      if (name === "manager_dashboard") return { data: { total_medicines: metrics.total_medicines, low_stock_items: metrics.low_stock_items, out_of_stock_items: metrics.out_of_stock_items, expiring_items: 1 }, error: null };
+      if (name === "supplier_operational_summary") { const summary = summarizeSupplier(String(args.p_supplier_id), (supplierFixtureTables().purchases ?? []) as PurchaseSummary[]); return { data: { deliveries: summary.deliveries, medicineCount: summary.medicineCount, drafts: summary.drafts, lastPurchase: summary.lastPurchase, lastPurchases: summary.lastPurchases }, error: null }; }
       if (name === "supplier_purchase_summary") return { data: summarizeSupplier(String(args.p_supplier_id), (supplierFixtureTables().purchases ?? []) as PurchaseSummary[]), error: null };
       if (name === "owner_financial_analytics") return { data: financialFixture({ ...financeRange(String(new URLSearchParams(location.search).get("period") ?? "today")), from: String(args.p_from), to: String(args.p_to), granularity: args.p_granularity as "hour" | "day" }, new URLSearchParams(location.search).has("empty")), error: null };
       if (name === "owner_dashboard_metrics" || name === "salesperson_dashboard") return { data: metrics, error: null };

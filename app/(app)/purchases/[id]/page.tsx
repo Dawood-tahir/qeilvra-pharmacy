@@ -9,12 +9,12 @@ import { postPurchaseAction } from "@/app/(app)/purchases/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 export default async function PurchaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireOwner();
+  await requireOperationsManager();
   const { id } = await params;
   const supabase = await createClient();
   const { data: purchase, error } = await supabase.from("purchases").select("*,suppliers(name,phone,email),purchase_items(id,batch_number,expiry_date,quantity,unit_cost,line_total,received_unit,received_quantity,base_units_per_received_unit,medicines(name,strength,sku,base_unit))").eq("id", id).single();

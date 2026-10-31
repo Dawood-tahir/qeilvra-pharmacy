@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { requireOwner, rpc, insert, from, revalidatePath } = vi.hoisted(() => ({ requireOwner: vi.fn(), rpc: vi.fn(), insert: vi.fn(), from: vi.fn(), revalidatePath: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ requireOwner }));
+const { requireOperationsManager, rpc, insert, from, revalidatePath } = vi.hoisted(() => ({ requireOperationsManager: vi.fn(), rpc: vi.fn(), insert: vi.fn(), from: vi.fn(), revalidatePath: vi.fn() }));
+vi.mock("@/lib/auth", () => ({ requireOperationsManager }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc, from }) }));
 vi.mock("next/cache", () => ({ revalidatePath }));
 import { receiveStockAction, saveGuidedMedicineAction } from "@/app/(app)/medicines/actions";
@@ -16,7 +16,7 @@ const purchase = { supplier_id: supplierId, invoice_date: "2026-10-18", discount
 const expense = () => { const form = new FormData(); Object.entries({ category_id: id, amount: "500", expense_date: "2026-10-18", description: "Electricity bill", payment_method: "cash" }).forEach(([k, value]) => form.set(k, value)); return form; };
 beforeEach(() => {
   vi.resetAllMocks();
-  requireOwner.mockResolvedValue({ id: "owner", role: "owner" });
+  requireOperationsManager.mockResolvedValue({ id: "owner", role: "owner" });
   rpc.mockResolvedValue({ data: { id, quantity: 100 }, error: null });
   insert.mockResolvedValue({ error: null });
   from.mockReturnValue({ insert });
@@ -74,7 +74,7 @@ describe("existing Owner receiving operations", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
   it("initial stock keeps supplier identity out of the permanent medicine fields", async () => {
-    const data = { name: "Paracetamol", dosage_form: "Tablet", strength: "500mg", barcode: "", manufacturer: "", tablets_per_strip: 10, strips_per_box: 10, supplier_id: supplierId, units: [{ unit_key: "base", selling_price: "7", max_price: null }] };
+    const data = { name: "Paracetamol", dosage_form: "Tablet", strength: "500mg", barcode: "", manufacturer: "", tablets_per_strip: 10, strips_per_box: 10, supplier_id: supplierId, units: [{ unit_key: "base", selling_price: "7", max_price: null }, { unit_key: "strip", selling_price: "65", max_price: null }, { unit_key: "box", selling_price: "620", max_price: null }] };
     expect(await saveGuidedMedicineAction(null, data, stock, key)).toMatchObject({ ok: true });
     expect(rpc).toHaveBeenCalledTimes(1);
     const args = rpc.mock.calls[0][1];
@@ -91,7 +91,7 @@ describe("existing Owner receiving operations", () => {
     expect(revalidatePath).not.toHaveBeenCalled();
   });
   it.each(["receive", "medicine", "draft", "post", "expense"])("%s refuses unauthorized callers before accessing the database", async (operation) => {
-    requireOwner.mockRejectedValue(new Error("Owner required"));
+    requireOperationsManager.mockRejectedValue(new Error("Owner required"));
     const form = new FormData(); form.set("id", id);
     const call = operation === "receive" ? () => receiveStockAction(id, stock, key) : operation === "medicine" ? () => saveGuidedMedicineAction(null, {}, stock, key) : operation === "draft" ? () => createPurchaseAction(purchase) : operation === "post" ? () => postPurchaseAction(form) : () => createExpenseAction(expense());
     await expect(call()).rejects.toThrow("Owner required");

@@ -9,13 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate, localDateISO } from "@/lib/utils";
 import { pageNumber } from "@/lib/pagination";
 
 export default async function StockPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; medicine?: string; supplier?: string; purchase?: string; actionPage?: string }> }) {
-  const staff = await requireOwner();
+  const staff = await requireOperationsManager();
   const params = await searchParams;
   const query = (params.q ?? "").slice(0, 100);
   const page = pageNumber(params.page);

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { saveOutcomeUnknown } from "@/lib/save-result";
 
@@ -13,7 +13,7 @@ const purchaseSchema = z.object({
 });
 
 export async function createPurchaseAction(input: unknown) {
-  await requireOwner();
+  await requireOperationsManager();
   const parsed = purchaseSchema.safeParse(input);
   if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0]?.message ?? "Check the purchase details." };
   const supabase = await createClient();
@@ -25,7 +25,7 @@ export async function createPurchaseAction(input: unknown) {
 }
 
 export async function postPurchaseAction(formData: FormData) {
-  await requireOwner();
+  await requireOperationsManager();
   const id = z.uuid().safeParse(formData.get("id"));
   if (!id.success) return { ok: false, error: "Select a saved purchase." };
   const supabase = await createClient();

@@ -30,9 +30,14 @@ const ownerNav: NavItem[] = [
   { label: "Suppliers", href: "/suppliers", icon: ContactRound },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Expenses", href: "/expenses", icon: WalletCards },
-  { label: "Salespeople", href: "/users", icon: Users },
+  { label: "Staff", href: "/users", icon: Users },
   { label: "Settings", href: "/settings", icon: Settings },
   { label: "Audit Log", href: "/audit", icon: ScrollText },
+];
+
+const managerNav: NavItem[] = [
+  ...ownerNav.filter(item => !["/reports", "/users", "/settings", "/audit"].includes(item.href)),
+  { label: "My Settings", href: "/profile", icon: Settings },
 ];
 
 const salespersonNav: NavItem[] = [
@@ -73,7 +78,7 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
     setCollapsed((value) => { try { localStorage.setItem("qeilvra-sidebar", value ? "expanded" : "collapsed"); } catch {} return !value; });
   }
 
-  const nav = staff.role === "owner" ? ownerNav : salespersonNav;
+  const nav = staff.role === "owner" ? ownerNav : staff.role === "manager" ? managerNav : salespersonNav;
 
   const isActive = useCallback((href: string) => pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`)), [pathname]);
   const mobilePrimary = useMemo(() => [

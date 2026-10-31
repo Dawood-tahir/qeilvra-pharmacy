@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireOwner } from "@/lib/auth";
+import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { dispositionSchema, recoverySchema } from "@/lib/stock-disposition";
 import { saveOutcomeUnknown } from "@/lib/save-result";
@@ -11,7 +11,7 @@ function refreshStock() {
  revalidatePath("/suppliers/[id]", "page"); revalidatePath("/purchases/[id]", "page");
 }
 export async function disposeStockAction(input: unknown) {
- await requireOwner();
+ await requireOperationsManager();
  const parsed=dispositionSchema.safeParse(input);
  if(!parsed.success)return {ok:false as const,error:parsed.error.issues[0]?.message??"Check the stock details."};
  const value=parsed.data; const supabase=await createClient();
@@ -21,7 +21,7 @@ export async function disposeStockAction(input: unknown) {
  refreshStock(); return {ok:true as const,id:String(data.id),quantity:Number(data.quantity),value:Number(data.value)};
 }
 export async function confirmSupplierRecoveryAction(input: unknown) {
- await requireOwner();
+ await requireOperationsManager();
  const parsed=recoverySchema.safeParse(input);
  if(!parsed.success)return {ok:false as const,error:parsed.error.issues[0]?.message??"Check the supplier settlement."};
  const value=parsed.data; const supabase=await createClient();
@@ -31,7 +31,7 @@ export async function confirmSupplierRecoveryAction(input: unknown) {
  refreshStock(); return {ok:true as const,id:String(data.id)};
 }
 export async function correctStockAction(input:unknown) {
- await requireOwner();
+ await requireOperationsManager();
  const parsed=z.object({batchId:z.uuid(),countedQuantity:z.number().int().nonnegative().max(999999999),expectedQuantity:z.number().nonnegative(),reason:z.string().trim().min(3).max(500)}).safeParse(input);
  if(!parsed.success)return {ok:false as const,error:parsed.error.issues[0]?.message??"Check the stock count."};
  const supabase=await createClient();
