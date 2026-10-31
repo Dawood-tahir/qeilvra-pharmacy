@@ -60,7 +60,9 @@ export async function updateSession(request: NextRequest) {
   }
   // An inactive profile can still have a valid Auth token. Let its sign-in error
   // render instead of bouncing forever between Dashboard and Login.
-  if (user && path === "/login" && request.nextUrl.searchParams.get("error") !== "inactive") {
+  // Let login form submissions reach their Server Action so its redirect updates
+  // the client router. A proxy redirect of the POST leaves the login URL stale.
+  if (user && (request.method === "GET" || request.method === "HEAD") && path === "/login" && request.nextUrl.searchParams.get("error") !== "inactive") {
     const urlTo = request.nextUrl.clone();
     urlTo.pathname = "/dashboard";
     urlTo.search = "";

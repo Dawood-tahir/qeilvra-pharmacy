@@ -31,6 +31,16 @@ describe("verified session proxy", () => {
     const response = await updateSession(new NextRequest("https://qeilvra.test/login"));
     expect(response.headers.get("location")).toBe("https://qeilvra.test/dashboard");
   });
+  it("lets an already authenticated login submission reach its Server Action", async () => {
+    const response = await updateSession(new NextRequest("https://qeilvra.test/login", {
+      method: "POST",
+      headers: { "Next-Action": "login-action" },
+    }));
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(getClaims).toHaveBeenCalledTimes(1);
+  });
   it("rejects invalid claims at protected API boundaries", async () => {
     getClaims.mockResolvedValue({ data: null, error: { message: "invalid signature" } });
     const response = await updateSession(new NextRequest("https://qeilvra.test/api/medicines/search"));
