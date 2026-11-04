@@ -30,7 +30,7 @@ for (const role of ["OWNER", "MANAGER"] as const) {
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await expect(page).toHaveURL(/\/dashboard/, { timeout: 30000 });
       await page.goto(`/suppliers/${fixtureId}`);
-      await page.getByRole("button", { name: "Edit Supplier", exact: true }).click();
+      await page.getByRole("button", { name: "Edit", exact: true }).click();
       const dialog = page.getByRole("dialog", { name: "Edit Supplier Information", exact: true });
       await expect(dialog).toBeVisible();
       await page.screenshot({ path: `test-results/supplier-edit-connected-${role.toLowerCase()}-${test.info().project.name}.png`, fullPage: true });
@@ -53,13 +53,13 @@ for (const role of ["OWNER", "MANAGER"] as const) {
       const { data: saved, error: readError } = await client.from("suppliers").select("*").eq("id", fixtureId).single();
       expect(readError).toBeNull();
       expect(saved).toMatchObject({ ...fixture, ...updates });
-      await page.getByRole("button", { name: "Edit Supplier", exact: true }).click();
+      await page.getByRole("button", { name: "Edit", exact: true }).click();
       await expect(dialog.getByLabel("Full Business Address")).toHaveValue(updates.address);
       await expect(dialog.getByLabel("Tax Registration Number")).toHaveValue(updates.tax_number);
       await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
       await page.getByRole("button", { name: "Deactivate", exact: true }).click();
       await expect(page.getByRole("button", { name: "Reactivate", exact: true })).toBeVisible();
-      await page.getByRole("button", { name: "Edit Supplier", exact: true }).click();
+      await page.getByRole("button", { name: "Edit", exact: true }).click();
       await dialog.getByLabel("City").fill("Karachi");
       await dialog.getByRole("button", { name: "Save Changes", exact: true }).click();
       await expect(dialog).toHaveCount(0, { timeout: 20000 });

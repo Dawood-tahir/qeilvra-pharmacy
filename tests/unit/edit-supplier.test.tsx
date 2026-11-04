@@ -13,7 +13,7 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-function open() { render(<EditSupplier supplier={supplier} />); fireEvent.click(screen.getByRole("button", { name: "Edit Supplier" })); }
+function open() { render(<EditSupplier supplier={supplier} />); fireEvent.click(screen.getByRole("button", { name: "Edit" })); }
 
 describe("supplier information editor", () => {
   it("prefills all seven existing values and leaves missing information blank", () => {
@@ -23,7 +23,7 @@ describe("supplier information editor", () => {
     expect(screen.getByLabelText("Full Business Address")).toHaveValue(supplier.address);
     cleanup();
     render(<EditSupplier supplier={{ ...supplier, contact_person: null, phone: null, email: null, address: null, city: null, tax_number: null }} />);
-    fireEvent.click(screen.getByRole("button", { name: "Edit Supplier" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.getByLabelText("City")).toHaveValue("");
   });
   it("cancels without writing and warns before discarding unsaved changes", () => {
@@ -37,6 +37,22 @@ describe("supplier information editor", () => {
     confirm.mockReturnValue(true);
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByLabelText("City")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByLabelText("City")).toHaveValue(supplier.city);
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+  it("prefills the new supplier when navigating between supplier details", async () => {
+    mocks.update.mockResolvedValue({ ok: true });
+    const view = render(<EditSupplier supplier={supplier} />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("City"), { target: { value: "Unsaved city" } });
+    const other = { ...supplier, id: "50000000-0000-4000-8000-000000000006", name: "Other Supplier", city: "Multan" };
+    view.rerender(<EditSupplier supplier={other} />);
+    expect(screen.getByLabelText("Supplier / Company Name *")).toHaveValue(other.name);
+    expect(screen.getByLabelText("City")).toHaveValue(other.city);
+    fireEvent.change(screen.getByLabelText("City"), { target: { value: "Karachi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith(other.id, expect.objectContaining({ name: other.name, city: "Karachi" })));
   });
   it("validates company, phone and email without clearing input or submitting", () => {
     open();
@@ -77,5 +93,26 @@ describe("supplier information editor", () => {
     expect(mocks.success).not.toHaveBeenCalled();
     fireEvent.click(await screen.findByRole("button", { name: "Save Changes" }));
     await waitFor(() => expect(mocks.success).toHaveBeenCalledOnce());
+  });
+  it("keeps entries and the editor open when a save request throws", async () => {
+    mocks.update.mockRejectedValue(new Error("Connection lost"));
+    open();
+    fireEvent.change(screen.getByLabelText("City"), { target: { value: "Karachi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    await screen.findByText(/The save could not be confirmed/);
+    expect(screen.getByLabelText("City")).toHaveValue("Karachi");
+    expect(screen.getByRole("button", { name: "Save Changes" })).toBeEnabled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+    expect(mocks.success).not.toHaveBeenCalled();
+  });
+  it("shows server validation errors beside their fields and preserves edits", async () => {
+    mocks.update.mockResolvedValue({ ok: false, error: "Check the highlighted supplier details.", fieldErrors: { name: "Check this company name." } });
+    open();
+    fireEvent.change(screen.getByLabelText("Supplier / Company Name *"), { target: { value: "Updated company" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+    await screen.findByText("Check this company name.");
+    expect(screen.getByLabelText("Supplier / Company Name *")).toHaveValue("Updated company");
+    expect(screen.getByLabelText("Supplier / Company Name *")).toHaveFocus();
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
 });

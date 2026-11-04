@@ -12,6 +12,9 @@ insert into public.suppliers(id,name,contact_person,phone,tax_number,created_by)
 select public.receive_stock((select id from public.test_ids where label='medicine'),jsonb_build_object(
  'supplier_id','52000000-0000-4000-8000-000000000005','unit_key','box','quantity',1,
  'batch_number','EDIT-SUPPLIER','expiry_date',current_date+365,'total_cost',100),gen_random_uuid());
+create temp table supplier_summary_before as select
+ (select coalesce(sum(total),0) from public.purchases where supplier_id='52000000-0000-4000-8000-000000000005' and status='posted') financial,
+ public.supplier_operational_summary('52000000-0000-4000-8000-000000000005') operational;
 reset role;
 create function pg_temp.supplier_related_snapshot() returns jsonb language plpgsql as $$
 declare relation record; fingerprint text; result jsonb:='{}';
@@ -34,6 +37,10 @@ select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001'
 update public.suppliers set name='City Pharmacy / Distributor',contact_person='Dr. Ahmed',phone='+92 300 1234567',email='orders@example.com',address=E'12 Main Road\nFloor 2',city='Lahore',tax_number='NTN-001 / A'
  where id='52000000-0000-4000-8000-000000000005';
 select public.test_assert((select name='City Pharmacy / Distributor' and contact_person='Dr. Ahmed' and phone='+92 300 1234567' and email='orders@example.com' and address=E'12 Main Road\nFloor 2' and city='Lahore' and tax_number='NTN-001 / A' from public.suppliers where id='52000000-0000-4000-8000-000000000005'),'Owner updates all seven supplier fields on the existing record');
+select public.test_assert((select
+ (select coalesce(sum(total),0) from public.purchases where supplier_id='52000000-0000-4000-8000-000000000005' and status='posted')=financial and
+ public.supplier_operational_summary('52000000-0000-4000-8000-000000000005')=operational
+ from supplier_summary_before),'supplier totals, medicine counts, deliveries and last purchase dates remain unchanged');
 select set_config('request.jwt.claim.sub','31000000-0000-4000-8000-000000000003',true);
 with edited as (update public.suppliers set city='Karachi' where id='52000000-0000-4000-8000-000000000005' returning id)
 select public.test_assert((select count(*)=1 from edited),'authorized Manager can edit supplier information');

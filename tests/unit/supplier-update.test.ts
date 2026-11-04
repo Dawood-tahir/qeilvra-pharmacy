@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ staff: vi.fn(), createClient: vi.fn(), update: vi.fn(), eq: vi.fn(), select: vi.fn(), maybeSingle: vi.fn(), revalidate: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ getCurrentStaff: mocks.staff, requireOperationsManager: vi.fn() }));
+const mocks = vi.hoisted(() => ({ staff: vi.fn(), requireManager: vi.fn(), createClient: vi.fn(), update: vi.fn(), eq: vi.fn(), select: vi.fn(), maybeSingle: vi.fn(), revalidate: vi.fn() }));
+vi.mock("@/lib/auth", () => ({ getCurrentStaff: mocks.staff, requireOperationsManager: mocks.requireManager }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
-import { updateSupplierAction } from "@/app/(app)/suppliers/actions";
+import { setSupplierActiveAction, updateSupplierAction } from "@/app/(app)/suppliers/actions";
 
 const id = "50000000-0000-4000-8000-000000000005";
 const values = { name: "City Pharmacy", contact_person: "Ahmed", phone: "+923001234567", email: "orders@example.com", address: "12 Main Road\nFloor 2", city: "Lahore", tax_number: "NTN-001 / A" };
@@ -16,6 +16,30 @@ beforeEach(() => {
   mocks.eq.mockReturnValue({ select: mocks.select });
   mocks.update.mockReturnValue({ eq: mocks.eq });
   mocks.createClient.mockResolvedValue({ from: (table: string) => { expect(table).toBe("suppliers"); return { update: mocks.update }; } });
+});
+
+describe("independent supplier activation", () => {
+  it.each(["false", "true"])("changes only activation when active is %s", async active => {
+    mocks.eq.mockResolvedValueOnce({ error: null });
+    const form = new FormData();
+    form.set("id", id);
+    form.set("active", active);
+    form.set("name", "Do not overwrite supplier details");
+    expect(await setSupplierActiveAction(form)).toMatchObject({ ok: true });
+    expect(mocks.requireManager).toHaveBeenCalledOnce();
+    expect(mocks.update).toHaveBeenCalledExactlyOnceWith({ is_active: active === "true" });
+    expect(mocks.eq).toHaveBeenCalledWith("id", id);
+    expect(mocks.revalidate).toHaveBeenCalledWith(`/suppliers/${id}`);
+    expect(mocks.revalidate).toHaveBeenCalledWith("/suppliers");
+  });
+  it("requires server authorization before changing status", async () => {
+    mocks.requireManager.mockRejectedValue(new Error("Forbidden"));
+    const form = new FormData();
+    form.set("id", id);
+    form.set("active", "false");
+    await expect(setSupplierActiveAction(form)).rejects.toThrow("Forbidden");
+    expect(mocks.createClient).not.toHaveBeenCalled();
+  });
 });
 describe("supplier information update action", () => {
   it.each(["owner", "manager"])("allows an authorized %s to update only seven columns on the existing ID", async role => {

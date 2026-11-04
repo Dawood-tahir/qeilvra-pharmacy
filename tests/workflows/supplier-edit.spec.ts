@@ -4,7 +4,7 @@ const supplierId = "50000000-0000-4000-8000-000000000005";
 const path = `/suppliers/${supplierId}`;
 async function openEditor(page: import("@playwright/test").Page) {
   await page.goto(path);
-  await page.getByRole("button", { name: "Edit Supplier", exact: true }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
   return page.getByRole("dialog", { name: "Edit Supplier Information", exact: true });
 }
 
@@ -38,8 +38,8 @@ test("Cancel and Escape warn before discarding unsaved supplier changes", async 
   page.once("dialog", confirmation => confirmation.accept());
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Edit Supplier", exact: true })).toBeFocused();
-  await page.getByRole("button", { name: "Edit Supplier", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Edit", exact: true })).toBeFocused();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(page.getByLabel("City", { exact: true })).toHaveValue("");
   expect(writes).toBe(0);
 });

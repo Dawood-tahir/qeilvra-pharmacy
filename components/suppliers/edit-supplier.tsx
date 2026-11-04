@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, Pencil, X } from "lucide-react";
+import { Building2, LoaderCircle, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { updateSupplierAction } from "@/app/(app)/suppliers/actions";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ type EditableSupplier = Pick<Supplier, "id" | SupplierInformationField>;
 
 export function EditSupplier({ supplier }: { supplier: EditableSupplier }) {
   const [open, setOpen] = useState(false);
-  return <><Button type="button" size="sm" onClick={() => setOpen(true)}><Pencil aria-hidden="true" />Edit Supplier</Button>{open && <SupplierInformationForm supplier={supplier} onClose={() => setOpen(false)} />}</>;
+  return <><Button type="button" variant="outline" size="sm" className="border-blue-400 text-blue-600 shadow-sm shadow-blue-600/15 hover:border-blue-600 hover:bg-blue-50" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}><Pencil aria-hidden="true" />Edit</Button>{open && <SupplierInformationForm key={supplier.id} supplier={supplier} onClose={() => setOpen(false)} />}</>;
 }
 
 function SupplierInformationForm({ supplier, onClose }: { supplier: EditableSupplier; onClose: () => void }) {
@@ -89,8 +89,8 @@ function SupplierInformationForm({ supplier, onClose }: { supplier: EditableSupp
     };
     return <div className={options.full ? "min-w-0 sm:col-span-2" : "min-w-0"}><label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-[#071b45]">{label}{field === "name" && " *"}</label>{options.multiline ? <textarea {...props} rows={3} className="q-input min-h-24 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100" /> : <Input {...props} type={options.type ?? "text"} required={field === "name"} autoFocus={field === "name"} />}{fieldErrors[field] && <p id={`${id}-error`} className="mt-1 text-sm text-red-700" role="alert">{fieldErrors[field]}</p>}</div>;
   }
-  return <Dialog label="Edit Supplier Information" onClose={close} busy={pending} className="max-w-2xl bg-white">
-    <div className="flex items-start justify-between gap-3"><div><h2 className="text-xl font-extrabold text-[#071b45]">Edit Supplier Information</h2><p className="mt-1 text-sm text-slate-500">Update supplier contact and business details.</p></div><Button type="button" size="icon" variant="ghost" aria-label="Close supplier editor" disabled={pending} onClick={close}><X aria-hidden="true" /></Button></div>
+  return <Dialog label="Edit Supplier Information" onClose={close} busy={pending} className="q-supplier-editor max-w-2xl">
+    <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600"><Building2 aria-hidden="true" className="size-5" /></span><div className="min-w-0"><h2 className="text-xl font-extrabold text-[#071b45]">Edit Supplier Information</h2><p className="mt-1 text-sm text-slate-500">Update supplier contact and business details.</p></div></div><Button type="button" size="icon" variant="ghost" aria-label="Close supplier editor" disabled={pending} onClick={close}><X aria-hidden="true" /></Button></div>
     <form ref={formRef} onSubmit={save} noValidate className="mt-5">
       <fieldset disabled={pending} aria-busy={pending} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
         {input("name", "Supplier / Company Name", { maximum: 160, autoComplete: "organization", full: true })}
