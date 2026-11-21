@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, ChevronRight, PackageX } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { searchQuery } from "@/lib/live-search";
+import { HistorySearch } from "@/components/ui/live-route-form";
+import { RecordSearchResults, RecordSearchScope } from "@/components/ui/record-search-results";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -24,9 +27,10 @@ const tabs = [
   { id: "expiring", label: "Expiring" },
 ];
 
-export default async function AlertsPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
+export default async function AlertsPage({ searchParams }: { searchParams: Promise<{ filter?: string; q?: string | string[] }> }) {
   await requireStaff();
   const params = await searchParams;
+  const query = searchQuery(params.q);
   const selected = ["low_stock", "out_of_stock", "expiring"].includes(params.filter ?? "")
     ? params.filter!
     : "low_stock";
@@ -45,14 +49,9 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
           <Link key={tab.id} aria-current={selected === tab.id ? "page" : undefined} href={`/alerts?filter=${tab.id}`} className={cn("shrink-0 rounded-xl border px-4 py-2.5 text-sm font-semibold", selected === tab.id ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-600")}>{tab.label}</Link>
         ))}
       </div>
-      <Card className="mt-4">
-        <CardContent className="p-0">
-          {items.length === 0 ? (
-            <EmptyState icon={PackageX} title="Nothing needs attention" description="There are no medicines in this alert category." />
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {items.map((item) => (
-                <Link key={item.medicine_id} href={`/medicines/${item.medicine_id}`} className="flex min-h-16 items-center gap-3 p-4 hover:bg-slate-50">
+      <RecordSearchScope key={selected} complete query={query}><HistorySearch action="/alerts" query={query} label="Search stock alerts" filters={{ filter: selected }} /><Card className="mt-4">
+        <CardContent className="p-0"><RecordSearchResults empty={<EmptyState icon={PackageX} title="Nothing needs attention" description="There are no medicines in this alert category." />} rows={items.map((item) => ({ id: item.medicine_id, fields: [item.medicine_name, [item.medicine_name, item.strength].filter(Boolean).join(' '), item.sku], content: (
+                <Link prefetch={false} key={item.medicine_id} href={`/medicines/${item.medicine_id}`} className="flex min-h-16 items-center gap-3 p-4 hover:bg-slate-50">
                   <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", selected === "expiring" ? "bg-orange-50 text-orange-700" : "bg-red-50 text-red-700")}>
                     {selected === "expiring" ? <CalendarClock className="size-5" /> : <AlertTriangle className="size-5" />}
                   </span>
@@ -65,11 +64,8 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
                   </span>
                   <ChevronRight className="size-4 text-slate-300" />
                 </Link>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) }))} /></CardContent>
+      </Card></RecordSearchScope>
     </main>
   );
 }

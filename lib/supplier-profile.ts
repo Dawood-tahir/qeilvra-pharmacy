@@ -95,8 +95,3 @@ export function profilePage(value?: string) {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? Math.min(parsed, 100_000) : 1;
 }
-
-export function searchPattern(value: string) {
-  // PostgREST OR syntax treats punctuation as operators. Accept literal words only.
-  return "%" + value.replace(/[^\p{L}\p{N}\s-]/gu, " ").trim().replace(/\s+/g, "%") + "%";
-}

@@ -1,55 +1,76 @@
-import Form from "next/form";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight, PackageX, Search } from "lucide-react";
-import { StockActions } from "@/components/stock/stock-actions";
-import { DispositionHistory } from "@/components/stock/disposition-history";
 import { z } from "zod";
-import { loadDispositionHistory } from "@/lib/stock-disposition-data";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { DispositionHistory } from "@/components/stock/disposition-history";
+import { StockBatchList, type StockBatch } from "@/components/stock/stock-batch-list";
 import { requireOperationsManager } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
-import { formatCurrency, formatDate, localDateISO } from "@/lib/utils";
 import { pageNumber } from "@/lib/pagination";
+import { loadDispositionHistory } from "@/lib/stock-disposition-data";
+import { createClient } from "@/lib/supabase/server";
+import { localDateISO } from "@/lib/utils";
 
-export default async function StockPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; medicine?: string; supplier?: string; purchase?: string; actionPage?: string }> }) {
-  const staff = await requireOperationsManager();
-  const params = await searchParams;
-  const query = (params.q ?? "").slice(0, 100);
-  const page = pageNumber(params.page);
-  const pageSize = 30;
-  const supplierFilter = z.uuid().safeParse(params.supplier);
-  const purchaseFilter = z.uuid().safeParse(params.purchase);
-  const supabase = await createClient();
-  let request = supabase.from("medicine_batches").select("id,supplier_id,batch_number,expiry_date,quantity_on_hand,purchase_cost::text,is_quarantined,medicines!inner(id,name,strength,sku,base_unit),suppliers(name),purchase_items(purchases(supplier_id,suppliers(name)))", { count: "exact" }).order("expiry_date").range((page - 1) * pageSize, page * pageSize - 1);
-  if (supplierFilter.success) request = request.eq("supplier_id", supplierFilter.data);
-  if (params.medicine) request = request.eq("medicine_id", params.medicine);
-  if (query) {
-    const safeQuery = query.replace(/[,%()]/g, " ");
-    const { data: matchingMedicines, error: searchError } = await supabase.from("medicines").select("id").or(`name.ilike.%${safeQuery}%,generic_name.ilike.%${safeQuery}%,sku.ilike.%${safeQuery}%`).limit(100);
-    if (searchError) throw new Error("Medicine search could not be loaded. Please try again.");
-    const medicineIds = (matchingMedicines ?? []).map((item) => item.id);
-    request = request.or([`batch_number.ilike.%${safeQuery}%`, ...(medicineIds.length ? [`medicine_id.in.(${medicineIds.join(",")})`] : [])].join(","));
+const FETCH_SIZE = 1000;
+
+async function loadStockBatches(client: Awaited<ReturnType<typeof createClient>>, medicineId?: string, supplierId?: string) {
+  const batches: StockBatch[] = [];
+  let afterId: string | undefined;
+
+  // Read past Supabase's row limit using the batch ID as a stable cursor.
+  for (;;) {
+    let request = client.from("medicine_batches")
+      .select("id,supplier_id,batch_number,expiry_date,quantity_on_hand,purchase_cost::text,is_quarantined,medicines!inner(id,name,generic_name,strength,sku,base_unit),suppliers(name),purchase_items(purchases(supplier_id,suppliers(name)))")
+      .order("id")
+      .limit(FETCH_SIZE);
+    if (medicineId) request = request.eq("medicine_id", medicineId);
+    if (supplierId) request = request.eq("supplier_id", supplierId);
+    if (afterId) request = request.gt("id", afterId);
+
+    const { data, error } = await request;
+    if (error) throw new Error("Stock batches could not be loaded. Please try again.");
+    const rows = (data ?? []) as unknown as StockBatch[];
+    batches.push(...rows);
+    if (rows.length < FETCH_SIZE) break;
+    afterId = rows[rows.length - 1].id;
   }
-  const [{ data, count, error }, supplierResult, history] = await Promise.all([request, supabase.from("suppliers").select("id,name").order("name"), loadDispositionHistory({ stockPage: true, page: pageNumber(params.actionPage), supplierId: supplierFilter.success ? supplierFilter.data : undefined, purchaseId: purchaseFilter.success ? purchaseFilter.data : undefined, medicineId: z.uuid().safeParse(params.medicine).success ? params.medicine : undefined })]);
-  if (supplierResult.error) throw new Error("Suppliers could not be loaded. Please retry.");
-  const suppliers = supplierResult.data ?? [];
-  if (error) throw new Error("Stock batches could not be loaded. Please try again.");
-  const batches = (data ?? []) as unknown as StockBatch[];
-  const today = localDateISO();
-  const pageHref = (next: number) => `/stock?${new URLSearchParams({ ...(query ? { q: query } : {}), ...(params.medicine ? { medicine: params.medicine } : {}), ...(supplierFilter.success ? { supplier: supplierFilter.data } : {}), ...(purchaseFilter.success ? { purchase: purchaseFilter.data } : {}), page: String(next) })}`;
-  return <main className="mx-auto max-w-[1450px] p-4 sm:p-6 lg:p-8"><div><p className="text-sm font-semibold text-blue-700">Batch-level inventory</p><h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">Stock batches & corrections</h1><p className="mt-1 text-sm text-slate-500">Check each received batch, its expiry and supplier. Choose a medicine and batch, then Discard Stock or Return to Supplier. Expired stock is blocked from POS before disposal. Correct Stock is for physical count corrections.</p></div><Form action="/stock" className="mt-5 flex gap-2"><div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-3.5 size-5 text-slate-400" /><input aria-label="Search medicine or batch number" name="q" defaultValue={query} className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Medicine or batch number" /></div>{params.medicine && <input type="hidden" name="medicine" value={params.medicine} />}<button className={buttonVariants({ size: "lg" })}>Search</button></Form><Card className="mt-4 overflow-hidden"><CardContent className="p-0">{batches.length === 0 ? <EmptyState icon={PackageX} title="No stock batches found" description="Use Add More Stock in Inventory to receive a batch." /> : <><div className="hidden overflow-x-auto md:block"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-5 py-3">Medicine</th><th className="px-4 py-3">Batch</th><th className="px-4 py-3">Expiry</th><th className="px-4 py-3">Supplier</th><th className="px-4 py-3">Quantity</th><th className="px-4 py-3">Unit cost</th><th className="px-4 py-3">Status</th><th className="relative px-4 py-3"><span className="sr-only">Action</span></th></tr></thead><tbody>{batches.map((row) => { const med = row.medicines as unknown as { id: string; name: string; strength?: string; sku: string; base_unit: string }; const supplier = (row.suppliers ?? row.purchase_items?.purchases?.suppliers) as { name?: string } | null; const expired = row.expiry_date < today; return <tr key={row.id} className="border-t border-slate-100"><td className="px-5 py-3"><Link className="font-bold hover:text-blue-700" href={`/medicines/${med.id}`}>{med.name} {med.strength}</Link><p className="text-xs text-slate-500">{med.sku}</p></td><td className="px-4 py-3 font-medium">{row.batch_number}</td><td className="px-4 py-3">{formatDate(row.expiry_date)}</td><td className="px-4 py-3">{supplier?.name ?? "—"}</td><td className="px-4 py-3 font-extrabold">{row.quantity_on_hand} <span className="font-normal text-slate-500">{med.base_unit}</span></td><td className="px-4 py-3">{formatCurrency(row.purchase_cost)}</td><td className="px-4 py-3"><Badge variant={row.is_quarantined || expired ? "destructive" : Number(row.quantity_on_hand) <= 0 ? "neutral" : "success"}>{row.is_quarantined ? "Quarantined" : expired ? "Expired" : Number(row.quantity_on_hand) <= 0 ? "Empty" : "Sellable"}</Badge></td><td className="px-4 py-3"><BatchActions row={row} staffId={staff.id} suppliers={suppliers} expired={expired} /></td></tr>; })}</tbody></table></div><div className="divide-y divide-slate-100 md:hidden">{batches.map((row) => {
-  const med = row.medicines as unknown as { id: string; name: string; strength?: string; base_unit: string };
-  const supplier = (row.suppliers ?? row.purchase_items?.purchases?.suppliers) as { name?: string } | null;
-  const expired = row.expiry_date < today;
-  return <article key={row.id} className="p-4"><div className="flex flex-wrap justify-between gap-2"><Link href={"/medicines/" + med.id} className="min-w-0 break-words font-bold text-blue-700">{med.name} {med.strength}</Link><Badge variant={row.is_quarantined || expired ? "destructive" : Number(row.quantity_on_hand) <= 0 ? "neutral" : "success"}>{row.is_quarantined ? "Quarantined" : expired ? "Expired" : Number(row.quantity_on_hand) <= 0 ? "Empty" : "Sellable"}</Badge></div><dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><div className="min-w-0"><dt className="text-xs text-slate-500">Batch</dt><dd className="break-words font-semibold">{row.batch_number}</dd></div><div><dt className="text-xs text-slate-500">Expiry</dt><dd>{formatDate(row.expiry_date)}</dd></div><div><dt className="text-xs text-slate-500">Quantity</dt><dd className="font-bold">{row.quantity_on_hand} {med.base_unit}s</dd></div><div><dt className="text-xs text-slate-500">Purchase cost per {med.base_unit}</dt><dd>{formatCurrency(row.purchase_cost)}</dd></div><div className="col-span-2 min-w-0"><dt className="text-xs text-slate-500">Supplier</dt><dd className="break-words">{supplier?.name ?? "Supplier not recorded"}</dd></div></dl><div className="mt-3 border-t pt-2"><BatchActions row={row} staffId={staff.id} suppliers={suppliers} expired={expired} /></div></article>;
-})}</div></>}</CardContent></Card><div className="mt-4 flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-slate-500">{count ?? 0} batches · Page {page}</p><div className="flex gap-2"><Link href={pageHref(Math.max(1, page - 1))} className={buttonVariants({ variant: "outline", size: "sm", className: page === 1 ? "pointer-events-none opacity-50" : "" })}><ChevronLeft /> Previous</Link><Link href={pageHref(page + 1)} className={buttonVariants({ variant: "outline", size: "sm", className: batches.length < pageSize ? "pointer-events-none opacity-50" : "" })}>Next <ChevronRight /></Link></div></div><DispositionHistory history={history} /></main>;
+
+  return batches.sort((a, b) => a.expiry_date.localeCompare(b.expiry_date));
 }
 
- type StockBatch = { id: string; supplier_id: string | null; batch_number: string; expiry_date: string; quantity_on_hand: number; purchase_cost: number | string; is_quarantined: boolean; medicines: { id: string; name: string; strength?: string; sku: string; base_unit: string }; suppliers: { name: string } | null; purchase_items?: { purchases: { supplier_id: string | null; suppliers: { name: string } | null } } | null };
-function BatchActions({ row, staffId, suppliers, expired }: { row: StockBatch; staffId: string; suppliers: { id: string; name: string }[]; expired: boolean }) {
- const origin=row.purchase_items?.purchases;
- return <StockActions staffId={staffId} batchId={row.id} medicine={row.medicines.name + " " + (row.medicines.strength ?? "")} batch={row.batch_number} quantity={Number(row.quantity_on_hand)} unit={row.medicines.base_unit} cost={row.purchase_cost} supplierId={row.supplier_id ?? origin?.supplier_id ?? null} supplierName={row.suppliers?.name ?? origin?.suppliers?.name} suppliers={suppliers} expired={expired} />;
+export default async function StockPage({ searchParams }: { searchParams: Promise<{ q?: string | string[]; page?: string; medicine?: string; supplier?: string; purchase?: string; actionPage?: string }> }) {
+  const staff = await requireOperationsManager();
+  const params = await searchParams;
+  const rawQuery = Array.isArray(params.q) ? params.q[0] : params.q;
+  const query = (rawQuery ?? "").slice(0, 100);
+  const page = pageNumber(params.page);
+  const supplierFilter = z.uuid().safeParse(params.supplier);
+  const purchaseFilter = z.uuid().safeParse(params.purchase);
+  const supplierId = supplierFilter.success ? supplierFilter.data : undefined;
+  const purchaseId = purchaseFilter.success ? purchaseFilter.data : undefined;
+  const actionPage = pageNumber(params.actionPage);
+  const supabase = await createClient();
+  const [batches, supplierResult, history] = await Promise.all([
+    loadStockBatches(supabase, params.medicine, supplierId),
+    supabase.from("suppliers").select("id,name").order("name"),
+    loadDispositionHistory({ stockPage: true, page: actionPage, supplierId, purchaseId, medicineId: z.uuid().safeParse(params.medicine).success ? params.medicine : undefined }),
+  ]);
+  if (supplierResult.error) throw new Error("Suppliers could not be loaded. Please retry.");
+
+  return (
+    <main className="mx-auto max-w-[1450px] p-4 sm:p-6 lg:p-8">
+      <div>
+        <p className="text-sm font-semibold text-blue-700">Batch-level inventory</p>
+        <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">Stock batches & corrections</h1>
+        <p className="mt-1 text-sm text-slate-500">Check each received batch, its expiry and supplier. Choose a medicine and batch, then Discard Stock or Return to Supplier. Expired stock is blocked from POS before disposal. Correct Stock is for physical count corrections.</p>
+      </div>
+      <StockBatchList
+        key={JSON.stringify([query, page, params.medicine, supplierId, purchaseId, actionPage])}
+        batches={batches}
+        suppliers={supplierResult.data ?? []}
+        staffId={staff.id}
+        today={localDateISO()}
+        initialQuery={query}
+        initialPage={page}
+        filters={{ medicine: params.medicine, supplier: supplierId, purchase: purchaseId, actionPage: params.actionPage }}
+      />
+      <DispositionHistory history={history} />
+    </main>
+  );
 }

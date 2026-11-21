@@ -42,6 +42,13 @@ class FixtureQuery {
   range(start: number, end: number) { this.start = start; this.end = end; return this; }
   overrideTypes() { return this; }
   or(filter: string, options?: { referencedTable?: string }) {
+    const regexes = Array.from(filter.matchAll(/([\w]+)\.imatch\."((?:\\.|[^"\\])*)"/g), ([, key, pattern]) =>
+      [key, new RegExp(pattern.replace(/\\(["\\])/g, "$1"), "i")] as const);
+    if (regexes.length) {
+      const prefix = options?.referencedTable ? options.referencedTable + "." : "";
+      this.rows = this.rows.filter((row) => regexes.some(([key, regex]) => regex.test(String(this.value(row, prefix + key) ?? ""))));
+      return this;
+    }
     this.rows = this.rows.filter((row) => filter.split(",").some((part) => {
       const [key, , pattern] = part.split(".");
       const value = String(this.value(row, options?.referencedTable ? options.referencedTable + "." + key : key) ?? "").toLowerCase();

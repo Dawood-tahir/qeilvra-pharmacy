@@ -50,9 +50,10 @@ test("recent sales load automatically and search accepts medicine names, dates a
   expect(lookups[0].searchParams.get("q")).toBe("");
   await dialog.getByRole("button", { name: "Next", exact: true }).click();
   await expect(dialog.getByText("Page 2", { exact: true })).toBeVisible();
+  await dialog.getByLabel("Invoice or medicine").fill("P");
+  await expect.poll(() => lookups.at(-1)?.searchParams.get("q")).toBe("P");
   await dialog.getByLabel("Invoice or medicine").fill("Paracetamol");
   await dialog.getByLabel("Sale date").fill(localDateISO());
-  await dialog.getByRole("button", { name: "Search", exact: true }).click();
   await expect.poll(() => lookups.at(-1)?.searchParams.get("date")).toBe(localDateISO());
   expect(lookups.at(-1)?.searchParams.get("q")).toBe("Paracetamol");
   await noOverflow(page);

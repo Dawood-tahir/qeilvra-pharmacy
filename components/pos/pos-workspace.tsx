@@ -15,6 +15,8 @@ import { DialogLoading } from "@/components/ui/dialog-loading";
 import type { AppRole } from "@/lib/auth";
 
 import { posTotals, validAmount, type DiscountMode } from "@/lib/pos-totals";
+import { useMedicineSearch } from "@/components/medicines/use-medicine-search";
+import { NO_SEARCH_MATCHES } from "@/lib/live-search";
 import "./pos-workspace.css";
 
 type CartItem = StockMedicine & { quantity: number; unit: SellingUnit; lineKey: string; itemDiscount?: string; discountMode?: DiscountMode };
@@ -29,10 +31,7 @@ const cartSchema = z.array(z.object({
 
 export function PosWorkspace({ role, staffId = "local", initialMedicines }: { role: AppRole; staffId?: string; initialMedicines?: StockMedicine[] }) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [medicines, setMedicines] = useState<StockMedicine[]>(initialMedicines ?? []);
-  const [loading, setLoading] = useState(false);
-  const [searchError, setSearchError] = useState("");
+  const { query, setQuery, results: medicines, loading, error: searchError, reload } = useMedicineSearch({ initialCatalog: initialMedicines, limit: 30 });
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -50,10 +49,8 @@ export function PosWorkspace({ role, staffId = "local", initialMedicines }: { ro
   const [request, setRequest] = useState<CheckoutRequest | null>(null);
   const [saleResult, setSaleResult] = useState<SaleResult | null>(null);
   const [restored, setRestored] = useState(false);
-  const [searchVersion, setSearchVersion] = useState(0);
   const [preferredUnits, setPreferredUnits] = useState<Record<string, string>>({});
   const searchRef = useRef<HTMLInputElement>(null);
-  const searchStarted = useRef(false);
   const busyRef = useRef(false);
   const storageKey = "qeilvra-cart-v2-" + staffId;
   const totals = useMemo(() => posTotals(cart, discount, discountMode, extraAmount), [cart, discount, discountMode, extraAmount]);
@@ -81,24 +78,6 @@ export function PosWorkspace({ role, staffId = "local", initialMedicines }: { ro
   useEffect(() => {
     if (restored) { try { sessionStorage.setItem(storageKey, JSON.stringify({ cart, request, saleResult, discount, discountMode, extraAmount, extraDescription })); } catch { /* Counter still works when storage is unavailable. */ } }
   }, [cart, request, saleResult, discount, discountMode, extraAmount, extraDescription, restored, storageKey]);
-  useEffect(() => {
-    // Server results cover only the first empty search. Clearing a later search,
-    // retrying, and completing checkout must still read current stock from the API.
-    if (!searchStarted.current && initialMedicines !== undefined && !query && searchVersion === 0) return;
-    searchStarted.current = true;
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setLoading(true); setSearchError("");
-      try {
-        const response = await fetch("/api/medicines/search?q=" + encodeURIComponent(query.trim()) + "&limit=30", { signal: controller.signal, cache: "no-store" });
-        if (!response.ok) throw new Error();
-        const data = await response.json();
-        if (!controller.signal.aborted) setMedicines(data);
-      } catch { if (!controller.signal.aborted) { setMedicines([]); setSearchError("Could not load medicines. Check your connection and try again."); } }
-      finally { if (!controller.signal.aborted) setLoading(false); }
-    }, query ? 220 : 0);
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [query, searchVersion, initialMedicines]);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => { if (e.key === "F4") { e.preventDefault(); searchRef.current?.focus(); } };
     window.addEventListener("keydown", listener); return () => window.removeEventListener("keydown", listener);
@@ -148,7 +127,7 @@ export function PosWorkspace({ role, staffId = "local", initialMedicines }: { ro
       if (!response.ok) {
         // Permission/session failures on a retry may hide an already committed sale.
         // Only a known transaction rollback (or first-attempt validation failure) unlocks editing.
-        if ((!request && response.status === 400) || response.status === 409 || (response.status === 403 && result.error === "Discount exceeds the salesperson limit.")) { setRequest(null); setSearchVersion((n) => n + 1); }
+        if ((!request && response.status === 400) || response.status === 409 || (response.status === 403 && result.error === "Discount exceeds the salesperson limit.")) { setRequest(null); reload(); }
         throw new Error(result.error ?? "The sale could not be confirmed. Retry to check its status.");
       }
       if (!result.sale_id || !result.invoice_number) throw new Error("The sale could not be confirmed. Retry to check its status.");
@@ -159,17 +138,17 @@ export function PosWorkspace({ role, staffId = "local", initialMedicines }: { ro
     } catch (error) { toast.error(error instanceof Error ? error.message : "The sale could not be confirmed. Retry this sale before starting another."); }
     finally { busyRef.current = false; setProcessing(false); }
   }
-  function nextSale() { setCart([]); setExtraAmount("0"); setExtraDescription(""); setDiscountMode("fixed"); setCardConfirmed(false); setRequest(null); setSaleResult(null); setDiscount("0"); setTendered(""); setMethod("cash"); setQuery(""); setSearchVersion((n) => n + 1); }
+  function nextSale() { setCart([]); setExtraAmount("0"); setExtraDescription(""); setDiscountMode("fixed"); setCardConfirmed(false); setRequest(null); setSaleResult(null); setDiscount("0"); setTendered(""); setMethod("cash"); setQuery(""); reload(); }
   if (saleResult) return <main className="grid min-h-[70vh] place-items-center p-4"><Card className="w-full max-w-lg p-6 text-center"><CheckCircle2 className="mx-auto size-14 text-emerald-600" /><p className="mt-4 text-sm font-bold text-emerald-700">Sale completed</p><h1 className="mt-2 text-xl font-extrabold">{saleResult.invoice_number}</h1><p className="mt-4 text-3xl font-extrabold">{formatCurrency(saleResult.net_total)}</p>{Number(saleResult.change_amount) > 0 && <p className="mt-2">Change: {formatCurrency(saleResult.change_amount)}</p>}<div className="mt-6 grid gap-3"><Link className={buttonVariants({ size: "lg" })} href={"/sales/" + saleResult.sale_id + "?print=thermal&width=" + paperWidth}><Printer /> Print receipt</Link><Button size="lg" variant="outline" onClick={nextSale}>Next sale</Button></div></Card></main>;
   const panel = <CartPanel cart={cart} subtotal={subtotalMinor / 100} total={total} discount={discount} onDiscount={setDiscount} discountMode={discountMode} onDiscountMode={setDiscountMode} appliedDiscount={totals.discount / 100} extraAmount={extraAmount} onExtraAmount={setExtraAmount} extraDescription={extraDescription} onExtraDescription={setExtraDescription} onItemDiscount={(key, value, mode) => setCart(current => current.map(line => line.lineKey === key ? { ...line, itemDiscount: value, discountMode: mode } : line))} onQuantity={quantity} onCheckout={() => { if (!request) setCardConfirmed(false); setCartOpen(false); setPaymentOpen(true); }} locked={Boolean(request) || processing} autoPrint={autoPrint} onAutoPrint={printing} paperWidth={paperWidth} onPaperWidth={paper} onReturn={() => { setCartOpen(false); setReturnOpen(true); }} onClose={cartOpen ? () => setCartOpen(false) : undefined} />;
   return <main data-role={role} className="pos-workspace">
     <section className="pos-catalog q-glass-secondary"><div className="flex items-center gap-3"><span className="grid size-11 shrink-0 place-items-center rounded-xl border border-blue-100 bg-blue-50 text-blue-700"><ShoppingCart aria-hidden="true" className="size-6" /></span><div><h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">POS / Sales</h1><p className="mt-0.5 text-xs text-slate-600 sm:text-sm">Search and add medicines to cart</p></div></div>
-      <div className="relative mt-3"><Search aria-hidden="true" className="pointer-events-none absolute left-3 top-3.5 size-5 text-slate-400" /><Input ref={searchRef} autoFocus className="h-12 pl-11 text-base" aria-label="Medicine search" aria-describedby="pos-search-help" placeholder="Search or scan medicine" value={query} onChange={(e) => { setQuery(e.target.value); setMedicines([]); setLoading(true); setSearchError(""); }} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === "ArrowDown") && !loading) { event.preventDefault(); document.getElementById("pos-medicines")?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus(); } }} /></div><p id="pos-search-help" className="mt-2 text-xs leading-5 text-slate-600">Choose a selling unit, then add to cart. <span className="hidden sm:inline">F4 focuses search.</span></p>
+      <div className="relative mt-3"><Search aria-hidden="true" className="pointer-events-none absolute left-3 top-3.5 size-5 text-slate-400" /><Input ref={searchRef} autoFocus className="h-12 pl-11 text-base" aria-label="Medicine search" aria-describedby="pos-search-help" placeholder="Search or scan medicine" value={query} maxLength={100} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === "ArrowDown") && !loading) { event.preventDefault(); document.getElementById("pos-medicines")?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus(); } }} /></div><p id="pos-search-help" className="mt-2 text-xs leading-5 text-slate-600">Choose a selling unit, then add to cart. <span className="hidden sm:inline">F4 focuses search.</span></p>
       {request && <div role="alert" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Sale status is unconfirmed. Retry safely before changing the cart.<Button className="mt-2 w-full" onClick={() => setPaymentOpen(true)}>Retry Sale</Button></div>}
-      {searchError && <div role="alert" className="mt-3 text-sm text-red-700">{searchError}<Button variant="ghost" onClick={() => setSearchVersion((n) => n + 1)}>Try again</Button></div>}
+      {searchError && <div role="alert" className="mt-3 text-sm text-red-700">Could not load medicines. Check your connection and try again.<Button variant="ghost" onClick={() => reload()}>Try again</Button></div>}
       <div id="pos-medicines" aria-busy={loading} className="pos-medicines scrollbar-thin">
         {loading && !medicines.length && <><p role="status" className="col-span-full text-sm text-slate-500">Finding medicines...</p>{[0,1,2,3,4,5].map(index => <div key={index} aria-hidden="true" className={cn("rounded-xl border border-slate-200 bg-white p-3", index > 1 && "hidden sm:block")}><div className="skeleton h-4 w-2/3 rounded" /><div className="skeleton mt-2 h-3 w-1/2 rounded" /><div className="skeleton mt-5 h-11 rounded-lg" /><div className="skeleton mt-3 h-8 rounded-lg" /><div className="skeleton mt-3 h-11 rounded-lg" /></div>)}</>}
-        {!loading && !searchError && !medicines.length && <p className="col-span-full rounded-xl bg-white p-6 text-sm text-slate-500">No medicines found. Try another name or barcode.</p>}
+        {!loading && !searchError && !medicines.length && <p className="col-span-full rounded-xl bg-white p-6 text-sm text-slate-500">{query.trim() ? NO_SEARCH_MATCHES : "No medicines found."}</p>}
         {medicines.map((m) => <MedicineCard key={m.id} medicine={m} preferred={preferredUnits[m.id]} inCart={cartBaseQuantity(cart, m.id)} locked={Boolean(request) || processing} onAdd={(u, q) => add(m, u, q)} />)}
       </div>
     </section>
@@ -178,7 +157,7 @@ export function PosWorkspace({ role, staffId = "local", initialMedicines }: { ro
     {cartOpen && <Dialog label="Current sale" fallbackFocus={searchRef} fullScreen className="pos-cart-dialog p-0 sm:p-0" onClose={() => setCartOpen(false)}>{panel}</Dialog>}
     {paymentOpen && <Dialog label="Complete sale" fallbackFocus={searchRef} busy={processing} onClose={() => setPaymentOpen(false)}><div className="flex items-center justify-between"><h2 className="text-xl font-extrabold">{request ? "Confirm sale status" : "Complete sale"}</h2><Button variant="ghost" size="icon" aria-label="Close payment" disabled={processing} onClick={() => setPaymentOpen(false)}><X /></Button></div><div className="mt-5 rounded-xl bg-slate-950 p-5 text-white"><p className="text-sm text-slate-300">Total amount</p><p className="mt-1 text-3xl font-extrabold">{formatCurrency(request ? request.items.reduce((s, l) => s + toMinor(l.customPrice ?? l.expectedPrice) * l.quantity, 0) / 100 - request.discount - request.items.reduce((sum, line) => sum + (line.lineDiscount ?? 0), 0) + (request.extraAmount ?? 0) : total)}</p></div>{!request && <><BillDetails subtotal={subtotalMinor / 100} discount={totals.discount / 100} extraAmount={totals.extraAmount / 100} extraDescription={extraDescription} total={total} /><fieldset className="mt-4 flex gap-2" disabled={processing}><legend className="mb-2 text-sm font-bold">Payment method</legend>{(["cash", "card"] as const).map((value) => <Button key={value} variant={method === value ? "default" : "outline"} className="h-12 flex-1 capitalize" aria-pressed={method === value} onClick={() => { setMethod(value); setCardConfirmed(false); }}>{value}</Button>)}</fieldset>{method === "cash" && <label className="mt-4 block"><span className="mb-2 block text-sm font-bold">Cash received (Rs.)</span><Input autoFocus inputMode="decimal" value={tendered} disabled={processing} onChange={(e) => setTendered(e.target.value)} /><Button className="mt-2" variant="secondary" disabled={processing} onClick={() => setTendered(total.toFixed(2))}>Exact amount</Button><p className="mt-3 text-sm">Change: <strong>{formatCurrency(change)}</strong></p></label>}{method === "card" && <label className="mt-4 flex items-center gap-3 rounded-xl bg-blue-50 p-3 text-sm"><input type="checkbox" className="size-5 shrink-0" checked={cardConfirmed} disabled={processing} onChange={(e) => setCardConfirmed(e.target.checked)} />Payment confirmed on the external card machine</label>}</>}<Button size="lg" className="mt-5 w-full" onClick={checkout} disabled={processing || !cart.length || (!request && method === "card" && !cardConfirmed) || (!request && method === "cash" && toMinor(tendered) < totals.total)}>{processing ? <><LoaderCircle className="animate-spin" /> Completing sale...</> : request ? "Retry Sale" : "Complete Sale"}</Button></Dialog>}
     {returnOpen && <Suspense fallback={<DialogLoading label="Return / Refund" onClose={() => setReturnOpen(false)} />}>
-      <ReturnLookup staffId={staffId} onReturned={() => setSearchVersion((version) => version + 1)} onClose={() => setReturnOpen(false)} />
+      <ReturnLookup staffId={staffId} onReturned={reload} onClose={() => setReturnOpen(false)} />
     </Suspense>}
   </main>;
 }

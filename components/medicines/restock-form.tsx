@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { CheckCircle2, LoaderCircle, Search } from "lucide-react";
 import { receiveStockAction } from "@/app/(app)/medicines/actions";
@@ -10,14 +10,13 @@ import { SupplierSelect, type SupplierOption } from "@/components/purchases/supp
 import { cn, formatCurrency, formatDate, localDateISO } from "@/lib/utils";
 import { pluralUnit, stockQuantity, type StockMedicine } from "@/lib/medicine-units";
 import { receiveStockSchema } from "@/lib/guided-medicine";
+import { useMedicineSearch } from "@/components/medicines/use-medicine-search";
+import { NO_SEARCH_MATCHES } from "@/lib/live-search";
 
 const emptyStock = { unit_key: "base", quantity: "", batch_number: "", expiry_date: "", total_cost: "", supplier_id: "" };
 export function RestockForm({ initialMedicine = null, initialSupplierId = "", suppliers = [] }: { initialMedicine?: StockMedicine | null; initialSupplierId?: string; suppliers?: SupplierOption[] }) {
   const [medicine, setMedicine] = useState(initialMedicine);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<StockMedicine[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchVersion, setSearchVersion] = useState(0);
+  const { query, setQuery, results, loading, error: searchError, reload } = useMedicineSearch({ enabled: !medicine, limit: 10 });
   const [error, setError] = useState("");
   const [stock, setStock] = useState({ ...emptyStock, supplier_id: suppliers.some((supplier) => supplier.id === initialSupplierId) ? initialSupplierId : "" });
   const [review, setReview] = useState(false);
@@ -29,21 +28,6 @@ export function RestockForm({ initialMedicine = null, initialSupplierId = "", su
   const heading = useRef<HTMLHeadingElement>(null);
   const supplier = suppliers.find((s) => s.id === stock.supplier_id);
   const focusHeading = () => requestAnimationFrame(() => heading.current?.focus());
-  useEffect(() => {
-    if (medicine) return;
-    const controller = new AbortController();
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const response = await fetch("/api/medicines/search?q=" + encodeURIComponent(query) + "&limit=10", { signal: controller.signal, cache: "no-store" });
-        if (!response.ok) throw new Error();
-        const data = await response.json();
-        if (!controller.signal.aborted) { setResults(data); setError(""); }
-      } catch { if (!controller.signal.aborted) setError("Could not find medicines. Check your connection and try again."); }
-      finally { if (!controller.signal.aborted) setLoading(false); }
-    }, 200);
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [query, medicine, searchVersion]);
   const unit = medicine?.units.find((u) => u.unit_key === stock.unit_key);
   const total = stockQuantity(Number(stock.quantity), unit?.base_quantity ?? 0);
   function submit() {
@@ -62,10 +46,10 @@ export function RestockForm({ initialMedicine = null, initialSupplierId = "", su
       finally { busy.current = false; }
     });
   }
-  if (saved !== null && medicine) return <section className="py-6 text-center"><CheckCircle2 className="mx-auto size-14 text-emerald-600" /><h2 ref={heading} tabIndex={-1} className="mt-4 text-xl font-extrabold">Stock added successfully.</h2><p className="mt-2">{pluralUnit(medicine.base_unit, saved)} added to {medicine.name}.</p>{supplier && <p className="mt-2 text-sm text-slate-600">Purchased from {supplier.name}.</p>}<p className="mt-2 text-sm text-slate-500">This delivery is recorded in Purchases.</p><div className="mt-6 flex flex-col gap-3"><Button onClick={() => { setSaved(null); setMedicine(null); setStock(emptyStock); setQuery(""); setReview(false); setError(""); key.current = crypto.randomUUID(); }}>Add More Stock</Button><Link href={"/medicines/" + medicine.id} className={buttonVariants({ variant: "outline" })}>View Medicine</Link><Link href="/medicines" className={buttonVariants({ variant: "ghost" })}>Done</Link></div></section>;
+  if (saved !== null && medicine) return <section className="py-6 text-center"><CheckCircle2 className="mx-auto size-14 text-emerald-600" /><h2 ref={heading} tabIndex={-1} className="mt-4 text-xl font-extrabold">Stock added successfully.</h2><p className="mt-2">{pluralUnit(medicine.base_unit, saved)} added to {medicine.name}.</p>{supplier && <p className="mt-2 text-sm text-slate-600">Purchased from {supplier.name}.</p>}<p className="mt-2 text-sm text-slate-500">This delivery is recorded in Purchases.</p><div className="mt-6 flex flex-col gap-3"><Button onClick={() => { setSaved(null); setMedicine(null); setStock(emptyStock); setQuery(""); reload(); setReview(false); setError(""); key.current = crypto.randomUUID(); }}>Add More Stock</Button><Link href={"/medicines/" + medicine.id} className={buttonVariants({ variant: "outline" })}>View Medicine</Link><Link href="/medicines" className={buttonVariants({ variant: "ghost" })}>Done</Link></div></section>;
   return <div className="space-y-5">
     <ol aria-label="Stock receiving steps" className="grid grid-cols-3 gap-2 text-center text-xs font-bold">{["Medicine", "Supplier & stock", "Review"].map((label, i) => <li key={label} aria-current={(!medicine ? 0 : review ? 2 : 1) === i ? "step" : undefined} className={cn("rounded-xl px-2 py-3", (!medicine ? 0 : review ? 2 : 1) === i ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500")}>{i + 1}. {label}</li>)}</ol>
-    {!medicine ? <><Field label="Search or scan an existing medicine"><div className="relative"><Search className="absolute left-3 top-3.5 size-5 text-slate-400" /><Input className="h-12 pl-11" autoFocus value={query} onChange={(e) => { setQuery(e.target.value); setResults([]); setLoading(true); setError(""); }} placeholder="Name, generic name or barcode" /></div></Field>{loading && <p role="status" className="text-sm text-slate-500">Finding medicines...</p>}<div className="space-y-2">{results.map((m) => <button key={m.id} className="flex min-h-16 w-full items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:bg-blue-50" onClick={() => { setMedicine(m); setStock(emptyStock); setError(""); focusHeading(); }}><span><strong>{m.name} {m.strength}</strong><span className="mt-1 block text-xs text-slate-500">{m.manufacturer || m.sku}</span></span><span className="text-xs text-slate-600">{pluralUnit(m.base_unit, m.available_quantity)}</span></button>)}</div>{!loading && !results.length && !error && <p className="text-sm text-slate-500">No medicines found. Use <Link className="font-semibold text-blue-700 underline" href="/medicines/new">Add New Medicine</Link> for a medicine you have never entered.</p>}</> : <>
+    {!medicine ? <><Field label="Search or scan an existing medicine"><div className="relative"><Search className="absolute left-3 top-3.5 size-5 text-slate-400" /><Input className="h-12 pl-11" autoFocus value={query} maxLength={100} onChange={(event) => setQuery(event.target.value)} placeholder="Name, generic name or barcode" /></div></Field>{loading && <p role="status" className="text-sm text-slate-500">Finding medicines...</p>}<div className="space-y-2">{results.map((m) => <button key={m.id} className="flex min-h-16 w-full items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 text-left hover:bg-blue-50" onClick={() => { setMedicine(m); setStock(emptyStock); setError(""); focusHeading(); }}><span><strong>{m.name} {m.strength}</strong><span className="mt-1 block text-xs text-slate-500">{m.manufacturer || m.sku}</span></span><span className="text-xs text-slate-600">{pluralUnit(m.base_unit, m.available_quantity)}</span></button>)}</div>{!loading && !results.length && !searchError && <p className="text-sm text-slate-500">{query.trim() ? NO_SEARCH_MATCHES + "." : "No medicines found."} Use <Link className="font-semibold text-blue-700 underline" href="/medicines/new">Add New Medicine</Link> for a medicine you have never entered.</p>}</> : <>
       <div className="rounded-xl bg-blue-50 p-4"><h2 ref={heading} tabIndex={-1} className="font-extrabold">{review ? "Review stock: " : ""}{medicine.name} {medicine.strength}</h2><p className="mt-1 text-sm">Current available stock: {pluralUnit(medicine.base_unit, medicine.available_quantity)}</p>{!review && <button disabled={pending} className="mt-1 min-h-11 text-sm font-bold text-blue-700" onClick={() => { setMedicine(null); setReview(false); }}>Choose another medicine</button>}</div>
       {medicine.is_active === false || medicine.packaging_status !== "confirmed" ? <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Check that this medicine is active and confirm its stock unit and packaging first. <Link className="font-bold underline" href={"/medicines/" + medicine.id + "/edit"}>Review packaging</Link></p> : <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-4">
         {!review ? <fieldset disabled={pending} className="space-y-4">
@@ -87,6 +71,6 @@ export function RestockForm({ initialMedicine = null, initialSupplierId = "", su
         <div className="q-topbar sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-20 flex gap-3 rounded-xl border-t border-slate-200 px-3 py-3 lg:bottom-0">{review && !uncertain && <Button type="button" variant="outline" disabled={pending} onClick={() => { setReview(false); setError(""); focusHeading(); }}>Back</Button>}<Button className="flex-1" size="lg" disabled={pending}>{pending && <LoaderCircle className="animate-spin" />}{pending ? "Saving stock..." : uncertain ? "Retry Stock Save" : review ? "Add to Stock" : "Review Stock"}</Button></div>
       </form>}
     </>}
-    {!medicine && error && <div role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}<Button variant="ghost" onClick={() => setSearchVersion((n) => n + 1)}>Try again</Button></div>}
+    {!medicine && searchError && <div role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">Could not find medicines. Check your connection and try again.<Button variant="ghost" onClick={reload}>Try again</Button></div>}
   </div>;
 }

@@ -1,25 +1,15 @@
+import { readAllRows } from "@/lib/load-rows";
 import { loadDispositionHistory } from "@/lib/stock-disposition-data";
 import { requireOperationsManager } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { localDateISO } from "@/lib/utils";
-import { searchPattern, summarizeSupplier, supplierAlerts, type InventoryBatch, type InventoryMedicine, type PurchaseSummary, type Supplier, type SupplierDelivery, type SupplierInvoice, type SupplierSummary } from "@/lib/supplier-profile";
+import { textSearchFilter } from "@/lib/live-search";
+import { summarizeSupplier, supplierAlerts, type InventoryBatch, type InventoryMedicine, type PurchaseSummary, type Supplier, type SupplierDelivery, type SupplierInvoice, type SupplierSummary } from "@/lib/supplier-profile";
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 const PAGE_SIZE = 12;
 const itemFields = "id,medicine_id,batch_number,expiry_date,quantity,unit_cost,line_total,received_unit,received_quantity,base_units_per_received_unit,medicines!inner(name,strength,sku,base_unit)";
 const invoiceFields = "id,purchase_number,supplier_invoice_number,invoice_date,posted_at,status,total";
-
-// Range through lean rows so Supabase's response cap never silently truncates totals.
-async function allRows<T>(fetchPage: (start: number, end: number) => PromiseLike<{ data: unknown; error: unknown }>): Promise<T[]> {
-  const rows: T[] = [];
-  for (let start = 0; ; start += 200) {
-    const { data, error } = await fetchPage(start, start + 199);
-    if (error) throw new Error("Supplier records could not be loaded. Please try again.");
-    const page = (data ?? []) as T[];
-    rows.push(...page);
-    if (page.length < 200) return rows;
-  }
-}
 
 async function loadAlerts(client: Client, lastPurchases: Record<string, string>) {
   const ids = Object.keys(lastPurchases);
@@ -31,9 +21,9 @@ async function loadAlerts(client: Client, lastPurchases: Record<string, string>)
   for (let start = 0; start < ids.length; start += 100) {
     const chunk = ids.slice(start, start + 100);
     const [medicineRows, batchRows] = await Promise.all([
-      allRows<InventoryMedicine>((from, to) => client.from("medicines").select("id,name,strength,base_unit,reorder_level,is_active").in("id", chunk).order("id").range(from, to)),
+      readAllRows<InventoryMedicine>((from, to) => client.from("medicines").select("id,name,strength,base_unit,reorder_level,is_active").in("id", chunk).order("id").range(from, to)),
       // Deliberately no supplier filter: availability belongs to the whole pharmacy.
-      allRows<InventoryBatch>((from, to) => client.from("medicine_batches").select("id,medicine_id,quantity_on_hand,expiry_date,is_quarantined").in("medicine_id", chunk).gt("quantity_on_hand", 0).eq("is_quarantined", false).gte("expiry_date", localDateISO()).order("id").range(from, to)),
+      readAllRows<InventoryBatch>((from, to) => client.from("medicine_batches").select("id,medicine_id,quantity_on_hand,expiry_date,is_quarantined").in("medicine_id", chunk).gt("quantity_on_hand", 0).eq("is_quarantined", false).gte("expiry_date", localDateISO()).order("id").range(from, to)),
     ]);
     medicines.push(...medicineRows); batches.push(...batchRows);
   }
@@ -46,7 +36,7 @@ async function loadSummary(client: Client, id: string, includeMedicines: boolean
   // Allow the application to ship before the additive RPC migration is approved.
   // Only a missing function uses the legacy path; permission/DB errors must surface.
   if (error?.code !== "PGRST202") throw new Error("Supplier records could not be loaded. Please try again.");
-  const rows = await allRows<PurchaseSummary>((from, to) => client.from("purchases")
+  const rows = await readAllRows<PurchaseSummary>((from, to) => client.from("purchases")
     .select("id,supplier_id,invoice_date,status,total,purchase_items(medicine_id)")
     .eq("supplier_id", id).order("id").range(from, to));
   return summarizeSupplier(id, rows);
@@ -80,7 +70,7 @@ export async function loadSupplierProfile(id: string, options: ProfileOptions) {
       if (options.tab === "overview") request = request.eq("status", "posted");
       else {
         if (options.status !== "all") request = request.eq("status", options.status);
-        if (options.query) request = request.or(`purchase_number.ilike.${searchPattern(options.query)},supplier_invoice_number.ilike.${searchPattern(options.query)}`);
+        if (options.query) request = request.or(textSearchFilter(options.query, "purchase_number", "supplier_invoice_number"));
       }
       const { data, error, count } = await request.order("invoice_date", { ascending: false }).order("id", { ascending: false }).range(offset, offset + limit - 1);
       if (error) throw new Error("Purchase history could not be loaded. Please try again.");
@@ -89,7 +79,7 @@ export async function loadSupplierProfile(id: string, options: ProfileOptions) {
     (async () => {
       if (!["overview", "medicines"].includes(options.tab)) return { rows: [] as SupplierDelivery[], count: 0 };
       let request = client.from("purchase_items").select(`${itemFields},purchases!inner(${invoiceFields})`, { count: "exact" }).eq("purchases.supplier_id", id).eq("purchases.status", "posted");
-      if (options.tab === "medicines" && options.query) request = request.or(`name.ilike.${searchPattern(options.query)},strength.ilike.${searchPattern(options.query)},sku.ilike.${searchPattern(options.query)}`, { referencedTable: "medicines" });
+      if (options.tab === "medicines" && options.query) request = request.or(textSearchFilter(options.query, "name", "strength", "sku"), { referencedTable: "medicines" });
       const { data, error, count } = await request.order("purchases(invoice_date)", { ascending: false }).order("id", { ascending: false }).range(offset, offset + limit - 1);
       if (error) throw new Error("Medicines received could not be loaded. Please try again.");
       return { rows: (data ?? []) as unknown as SupplierDelivery[], count: count ?? 0 };

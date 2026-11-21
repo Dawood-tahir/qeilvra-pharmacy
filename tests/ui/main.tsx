@@ -47,9 +47,9 @@ switch (flow) {
   case "dashboard": screen = await DashboardPage({ searchParams }); break;
   case "purchase": screen = params.get("suppliers") === "none" ? <PurchaseForm suppliers={[]} /> : await NewPurchasePage(); break;
   case "purchase-detail": screen = await PurchaseDetailPage({ params: Promise.resolve({ id: location.pathname.startsWith("/purchases/") ? location.pathname.split("/").at(-1)! : purchase.id }) }); break;
-  case "purchases": screen = await PurchasesPage(); break;
+  case "purchases": screen = await PurchasesPage({ searchParams }); break;
   case "receipt": screen = await SaleDetailPage({ params: Promise.resolve({ id: sale.id }), searchParams }); break;
-  case "sales": screen = await SalesPage(); break;
+  case "sales": screen = await SalesPage({ searchParams }); break;
   case "returns": screen = await ReturnsPage(); break;
   case "expenses": screen = await ExpensesPage({ searchParams }); break;
   case "suppliers": screen = await SuppliersPage({ searchParams }); break;
@@ -57,9 +57,9 @@ switch (flow) {
   case "restock-page": screen = await RestockPage({ searchParams }); break;
   case "reports": screen = await ReportsPage({ searchParams }); break;
   case "settings": screen = await SettingsPage(); break;
-  case "users": screen = await UsersPage(); break;
+  case "users": screen = await UsersPage({ searchParams }); break;
   case "alerts": screen = await AlertsPage({ searchParams }); break;
-  case "notifications": screen = await NotificationsPage(); break;
+  case "notifications": screen = await NotificationsPage({ searchParams }); break;
   case "stock": screen = await StockPage({ searchParams }); break;
   default: screen = <main className="mx-auto max-w-3xl p-4"><h1 className="mb-4 text-2xl font-extrabold">{flow === "restock" ? "Add More Stock" : "Add New Medicine"}</h1><div className="rounded-2xl border border-slate-200 bg-white p-4">{flow === "restock" ? <RestockForm suppliers={params.get("suppliers") === "none" ? [] : suppliers} /> : <MedicineForm />}</div></main>;
 }

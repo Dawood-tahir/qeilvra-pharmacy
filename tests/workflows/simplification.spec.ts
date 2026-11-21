@@ -210,8 +210,9 @@ test("expense errors keep entries and success is shown only after confirmation",
 
 test("global search retries errors and finds an existing invoice by keyboard", async ({ page }) => {
   let attempts = 0;
-  await page.route("**/api/search?**", (route) => { attempts++; return route.fulfill({ status: attempts === 1 ? 503 : 200, json: attempts === 1 ? { error: "Unavailable" } : [{ id: sale.id, type: "invoice", title: sale.invoice_number, subtitle: "Test sale", meta: "Rs. 195" }] }); });
+  await page.route("**/api/search?**", (route) => { if (!new URL(route.request().url()).searchParams.get("q")) return route.fulfill({ json: [] }); attempts++; return route.fulfill({ status: attempts === 1 ? 503 : 200, json: attempts === 1 ? { error: "Unavailable" } : [{ id: sale.id, type: "invoice", title: sale.invoice_number, subtitle: "Test sale", meta: "Rs. 195" }] }); });
   await page.goto("/sales?shell=1");
+  await page.locator("header").getByRole("button", { name: /^Search/ }).filter({ visible: true }).first().waitFor();
   await page.keyboard.press("Control+k");
   const dialog = page.getByRole("dialog", { name: "Global search" });
   await dialog.getByLabel("Search medicines or invoices").fill("QEI-TEST");

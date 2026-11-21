@@ -94,7 +94,7 @@ test("typing an unknown supplier never creates one or records a supplier name as
   await start(page);
   const picker = page.getByRole("combobox", { name: /Purchased From/ });
   await picker.fill("Unknown supplier name");
-  await expect(page.getByText("No saved supplier matches. Try another name.")).toBeVisible();
+  await expect(page.getByText("No matching records found. Try another name.")).toBeVisible();
   await picker.press("Escape");
   await expect(picker).toHaveValue("");
   await stock(page); await prices(page);

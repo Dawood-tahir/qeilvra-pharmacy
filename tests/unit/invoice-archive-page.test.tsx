@@ -5,6 +5,7 @@ const { requireStaff, from, range } = vi.hoisted(() => ({ requireStaff: vi.fn(),
 vi.mock("@/lib/auth", () => ({ requireStaff }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from }) }));
 vi.mock("next/link", () => ({ default: ({ children }: { children: React.ReactNode }) => children }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 import SalesPage from "@/app/(app)/sales/page";
 
 beforeEach(() => {

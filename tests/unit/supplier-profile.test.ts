@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { profilePage, searchPattern, summarizeSupplier, supplierAlerts, type PurchaseSummary, type InventoryMedicine } from "@/lib/supplier-profile";
+import { profilePage, summarizeSupplier, supplierAlerts, type PurchaseSummary, type InventoryMedicine } from "@/lib/supplier-profile";
 
 const receipt = (id: string, date: string, total: number, status = "posted", supplier: string | null = "supplier", medicines = ["medicine"]): PurchaseSummary => ({ id, supplier_id: supplier, invoice_date: date, total, status, purchase_items: medicines.map((medicine_id) => ({ medicine_id })) });
 const medicine: InventoryMedicine = { id: "medicine", name: "Paracetamol", strength: "500mg", base_unit: "tablet", reorder_level: 10, is_active: true };
@@ -42,7 +42,6 @@ describe("supplier inventory alerts match the existing inventory eligibility", (
     expect(items.map((item) => item.id)).toEqual(["out", "medicine"]);
   });
   it("sanitizes filter operators and handles invalid pagination", () => {
-    expect(searchPattern("drug%,id.eq.other(test)")).toBe("%drug%id%eq%other%test%");
     for (const page of [undefined, "-1", "0", "NaN", "1.5", "Infinity"]) expect(profilePage(page)).toBe(1);
     expect(profilePage("2")).toBe(2);
   });

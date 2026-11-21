@@ -11,7 +11,7 @@ const medicines = Array.from({ length: 20 }, (_, index) => ({
 
 async function openCatalog(page: Page) {
   await page.route("**/api/medicines/search?**", route => route.fulfill({
-    json: new URL(route.request().url()).searchParams.get("q") === "rare-grid-match" ? [medicines[0]] : medicines,
+    json: medicines,
   }));
   await page.goto("/pos?shell=1");
   await expect(page.locator(".pos-medicine-card")).toHaveCount(medicines.length);
@@ -89,7 +89,7 @@ test("medicine cards stay compact and readable with varied names, units and spar
   const lastAdd = page.locator(".pos-medicine-card").last().getByRole("button", { name: "Add to Cart", exact: true });
   await lastAdd.scrollIntoViewIfNeeded();
   await expect(lastAdd).toBeInViewport({ ratio: 1 });
-  await page.getByRole("textbox", { name: "Medicine search" }).fill("rare-grid-match");
+  await page.getByRole("textbox", { name: "Medicine search" }).fill("Clavulanic");
   await expect(page.locator(".pos-medicine-card")).toHaveCount(1);
   await assertCardsFit(page);
   const sparseGrid = await gridGeometry(page);

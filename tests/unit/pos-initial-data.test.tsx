@@ -17,18 +17,37 @@ it("renders server medicine results after verified staff access without an initi
   expect(screen.getByRole("article", { name: "Paracetamol 500mg" })).toBeTruthy();
   await act(async () => { await vi.advanceTimersByTimeAsync(300); });
   expect(fetch).not.toHaveBeenCalled();
-  expect(rpc).toHaveBeenCalledWith("inventory_search", { p_query: "", p_limit: 30 });
+  expect(rpc).toHaveBeenCalledWith("inventory_search", { p_query: "", p_limit: 50, p_offset: 0 });
 });
-it("still searches and reloads current stock when a search is cleared", async () => {
-  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [medicine] }); vi.stubGlobal("fetch", fetch);
-  render(<PosWorkspace role="owner" initialMedicines={[{ ...medicine, packaging_status: "confirmed" }]} />);
-  fireEvent.change(screen.getByLabelText("Medicine search"), { target: { value: "para" } });
-  await act(async () => { await vi.advanceTimersByTimeAsync(250); });
-  expect(fetch.mock.calls[0][0]).toContain("q=para&limit=30");
-  fireEvent.change(screen.getByLabelText("Medicine search"), { target: { value: "" } });
-  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
-  expect(fetch.mock.calls[1][0]).toContain("q=&limit=30");
+it("filters preloaded stock instantly from one letter and restores it without another request", () => {
+  const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+  const first = { ...medicine, packaging_status: "confirmed" as const };
+  const second = { ...first, id: "second", name: "Aspirin", generic_name: "", sku: "ASP" };
+  render(<PosWorkspace role="owner" initialMedicines={[first, second]} />);
+  const search = screen.getByLabelText("Medicine search");
+  fireEvent.change(search, { target: { value: "r" } });
+  expect(screen.getAllByRole("article")).toHaveLength(2);
+  fireEvent.change(search, { target: { value: "aRa" } });
+  expect(screen.getByRole("article", { name: "Paracetamol 500mg" })).toBeInTheDocument();
+  expect(screen.queryByRole("article", { name: "Aspirin 500mg" })).not.toBeInTheDocument();
+  fireEvent.change(search, { target: { value: "no-hit" } });
+  expect(screen.getByText("No matching records found")).toBeInTheDocument();
+  fireEvent.change(search, { target: { value: "" } });
+  expect(screen.getAllByRole("article")).toHaveLength(2);
+  expect(fetch).not.toHaveBeenCalled();
 });
+it("finds a medicine beyond the first database page before making any search request", async () => {
+  const initial = Array.from({ length: 50 }, (_, index) => ({ ...medicine, id: String(index), name: "Aloe " + index, sku: "ALOE-" + index, barcode: "" }));
+  rpc.mockResolvedValueOnce({ data: initial, error: null }).mockResolvedValueOnce({ data: [medicine], error: null });
+  const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+  render(await PosPage());
+  expect(screen.queryByText("Paracetamol 500mg")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Medicine search"), { target: { value: "c" } });
+  expect(screen.getByRole("article", { name: "Paracetamol 500mg" })).toBeInTheDocument();
+  expect(rpc).toHaveBeenLastCalledWith("inventory_search", { p_query: "", p_limit: 50, p_offset: 50 });
+  expect(fetch).not.toHaveBeenCalled();
+});
+
 it("keeps the API fallback when initial medicine loading fails", async () => {
   rpc.mockResolvedValue({ data: null, error: { message: "unavailable" } });
   const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => [medicine] }); vi.stubGlobal("fetch", fetch);

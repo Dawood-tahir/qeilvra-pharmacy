@@ -2,14 +2,18 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { searchQuery } from "@/lib/live-search";
+import { HistorySearch } from "@/components/ui/live-route-form";
+import { RecordSearchResults, RecordSearchScope } from "@/components/ui/record-search-results";
 import { EmptyState } from "@/components/ui/empty-state";
 import { requireStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { cn, formatDateTime } from "@/lib/utils";
 import { safeAppPath } from "@/lib/navigation";
 
-export default async function NotificationsPage() {
+export default async function NotificationsPage({ searchParams = Promise.resolve({}) }: { searchParams?: Promise<{ q?: string | string[] }> } = {}) {
   await requireStaff();
+  const query = searchQuery((await searchParams).q);
   const supabase = await createClient();
   const { data, error } = await supabase.from("notifications").select("id,title,message,severity,action_url,read_at,created_at").order("created_at", { ascending: false }).limit(100);
   if (error) throw new Error("Notifications could not be loaded. Please try again.");
@@ -17,8 +21,7 @@ export default async function NotificationsPage() {
     <p className="text-sm font-semibold text-blue-700">Activity centre</p>
     <h1 className="mt-1 text-2xl font-extrabold">Notifications</h1>
     <p className="mt-1 text-sm text-slate-500">Open a notification to view its details and next action.</p>
-    <Card className="mt-5 overflow-hidden"><CardContent className="p-0">
-      {!data?.length ? <EmptyState icon={Bell} title="No notifications" description="Important stock and workflow notifications will appear here." /> : <div className="divide-y divide-slate-100">{data.map((item) => {
+    <RecordSearchScope complete query={query}><HistorySearch action="/notifications" query={query} label="Search notifications" /><Card className="mt-5 overflow-hidden"><CardContent className="p-0"><RecordSearchResults empty={<EmptyState icon={Bell} title="No notifications" description="Important stock and workflow notifications will appear here." />} rows={(data ?? []).map((item) => {
         const critical = item.severity === "critical";
         const warning = item.severity === "warning";
         const content = <div className="flex gap-3 p-4">
@@ -29,8 +32,7 @@ export default async function NotificationsPage() {
             <span className="mt-2 block text-xs text-slate-500">{formatDateTime(item.created_at)}</span>
           </span>
         </div>;
-        return item.action_url ? <Link key={item.id} className="block transition-colors hover:bg-blue-50/50 focus-visible:-outline-offset-2" href={safeAppPath(item.action_url)}>{content}</Link> : <div key={item.id}>{content}</div>;
-      })}</div>}
-    </CardContent></Card>
+        return { id: item.id, fields: [item.title, item.message, item.severity], content: item.action_url ? <Link prefetch={false} key={item.id} className="block transition-colors hover:bg-blue-50/50 focus-visible:-outline-offset-2" href={safeAppPath(item.action_url)}>{content}</Link> : <div key={item.id}>{content}</div> };
+      })} /></CardContent></Card></RecordSearchScope>
   </main>;
 }

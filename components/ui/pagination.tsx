@@ -7,8 +7,8 @@ export function Pagination({ pathname, page, hasMore, query = {} }: { pathname: 
   return <nav aria-label="Pagination" className="mt-4 flex flex-wrap items-center justify-between gap-3">
     <p className="text-xs text-slate-500">Page {page}</p>
     <div className="flex gap-2">
-      {page > 1 ? <Link className={buttonVariants({ variant: "outline", size: "sm" })} href={href(page - 1)}><ChevronLeft /> Previous</Link> : <span aria-disabled="true" className={buttonVariants({ variant: "outline", size: "sm", className: "opacity-50" })}><ChevronLeft /> Previous</span>}
-      {hasMore ? <Link className={buttonVariants({ variant: "outline", size: "sm" })} href={href(page + 1)}>Next <ChevronRight /></Link> : <span aria-disabled="true" className={buttonVariants({ variant: "outline", size: "sm", className: "opacity-50" })}>Next <ChevronRight /></span>}
+      {page > 1 ? <Link prefetch={query.q === undefined ? undefined : false} className={buttonVariants({ variant: "outline", size: "sm" })} href={href(page - 1)}><ChevronLeft /> Previous</Link> : <span aria-disabled="true" className={buttonVariants({ variant: "outline", size: "sm", className: "opacity-50" })}><ChevronLeft /> Previous</span>}
+      {hasMore ? <Link prefetch={query.q === undefined ? undefined : false} className={buttonVariants({ variant: "outline", size: "sm" })} href={href(page + 1)}>Next <ChevronRight /></Link> : <span aria-disabled="true" className={buttonVariants({ variant: "outline", size: "sm", className: "opacity-50" })}>Next <ChevronRight /></span>}
     </div>
   </nav>;
 }
