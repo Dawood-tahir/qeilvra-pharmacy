@@ -7,9 +7,6 @@ import { textSearchFilter } from "@/lib/live-search";
 
 const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }) }));
-vi.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ children, label }: { children: React.ReactNode; label: string }) => <div role="dialog" aria-label={label}>{children}</div>,
-}));
 
 afterEach(() => {
   cleanup();
@@ -72,13 +69,13 @@ it("global search reuses a complete response as the query narrows", async () => 
     ok: true,
     headers: new Headers({ "X-Search-Complete": "true" }),
     json: async () => [
-      { id: "1", type: "invoice", title: "RX-001", fields: ["RX-001"], subtitle: "Invoice" },
-      { id: "2", type: "medicine", title: "Aspirin", fields: ["Aspirin"], subtitle: "Medicine" },
+      { id: "1", type: "invoice", title: "RX-001", href: "/sales/1", fields: ["RX-001"], subtitle: "Invoice" },
+      { id: "2", type: "medicine", title: "Aspirin", href: "/medicines/2", fields: ["Aspirin"], subtitle: "Medicine" },
     ],
   });
   vi.stubGlobal("fetch", fetchRecords);
-  render(<GlobalSearch open onClose={vi.fn()} />);
-  const search = screen.getByLabelText("Search medicines or invoices");
+  render(<GlobalSearch />);
+  const search = screen.getByLabelText("Global search");
   fireEvent.change(search, { target: { value: "R" } });
   await act(async () => { await vi.advanceTimersByTimeAsync(200); });
   expect(fetchRecords).toHaveBeenCalledWith("/api/search?q=r", expect.anything());

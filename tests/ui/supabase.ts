@@ -75,6 +75,14 @@ export async function createClient() {
       if (name === "owner_sales_trend") return { data: [{ sale_date: localDateISO(), revenue: 45000, gross_profit: 12000, sale_count: 20 }], error: null };
       if (name === "owner_report_breakdowns") return { data: { medicine_sales: [{ medicine_id: medicine.id, medicine_name: medicine.name, quantity: 30, revenue: 195 }], salesperson_performance: [{ id: "staff", full_name: "Test Salesperson", sales_count: 20, revenue: 45000 }], purchase_total: 400, refund_total: 65, return_count: 1 }, error: null };
       if (name === "receipt_settings") return { data: tables.pharmacy_settings, error: null };
+      if (name === "inventory_batch_expiries") {
+        const today = localDateISO();
+        const ids = args.p_medicine_ids as string[];
+        return { data: ids.map((id) => {
+          const dates = tables.medicine_batches.filter((batch) => (batch.medicines as { id: string })?.id === id).map((batch) => String(batch.expiry_date)).sort();
+          return { medicine_id: id, earliest_expired: dates.find((date) => date < today) ?? null, nearest_unexpired: dates.find((date) => date >= today) ?? null };
+        }), error: null };
+      }
       if (name === "inventory_alerts") return { data: [{ medicine_id: medicine.id, medicine_name: medicine.name, sku: "PC", strength: "500mg", available_quantity: 3, reorder_level: 10, days_until_expiry: 12, expiry_date: "2098-12-25" }], error: null };
       const response = await fetch("/__test/inventory?" + new URLSearchParams(Object.fromEntries(Object.entries(args).map(([k, v]) => [k, String(v)]))));
       return { data: await response.json(), error: null };

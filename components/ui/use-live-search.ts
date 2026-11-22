@@ -35,7 +35,7 @@ export function useSearchView(initialQuery: string, initialPage: number) {
     setPage(1);
   }
 
-  function navigate(nextPage: number, value = query) {
+  function navigate(nextPage: number, value = query, params?: Record<string, string>) {
     setQuery(value);
     setPage(nextPage);
     const url = new URL(window.location.href);
@@ -44,6 +44,7 @@ export function useSearchView(initialQuery: string, initialPage: number) {
     else url.searchParams.delete("q");
     if (nextPage > 1) url.searchParams.set("page", String(nextPage));
     else url.searchParams.delete("page");
+    for (const [key, val] of Object.entries(params ?? {})) url.searchParams.set(key, val);
     if (url.href !== window.location.href) window.history.pushState(null, "", url);
   }
 

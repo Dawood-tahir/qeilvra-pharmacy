@@ -210,17 +210,20 @@ test("expense errors keep entries and success is shown only after confirmation",
 
 test("global search retries errors and finds an existing invoice by keyboard", async ({ page }) => {
   let attempts = 0;
-  await page.route("**/api/search?**", (route) => { if (!new URL(route.request().url()).searchParams.get("q")) return route.fulfill({ json: [] }); attempts++; return route.fulfill({ status: attempts === 1 ? 503 : 200, json: attempts === 1 ? { error: "Unavailable" } : [{ id: sale.id, type: "invoice", title: sale.invoice_number, subtitle: "Test sale", meta: "Rs. 195" }] }); });
+  await page.route("**/api/search?**", (route) => { if (!new URL(route.request().url()).searchParams.get("q")) return route.fulfill({ json: [] }); attempts++; return route.fulfill({ status: attempts === 1 ? 503 : 200, json: attempts === 1 ? { error: "Unavailable" } : [{ id: sale.id, type: "invoice", title: sale.invoice_number, subtitle: "Test sale", meta: "Rs. 195", href: "/sales/" + sale.id, fields: [sale.invoice_number] }] }); });
   await page.goto("/sales?shell=1");
-  await page.locator("header").getByRole("button", { name: /^Search/ }).filter({ visible: true }).first().waitFor();
+  const scope = page.locator("header").getByRole("search");
+  const input = scope.getByRole("textbox", { name: "Global search" });
+  await expect(input).toBeVisible();
   await page.keyboard.press("Control+k");
-  const dialog = page.getByRole("dialog", { name: "Global search" });
-  await dialog.getByLabel("Search medicines or invoices").fill("QEI-TEST");
-  await expect(dialog.getByRole("alert")).toContainText("Search could not load");
-  await dialog.getByRole("button", { name: "Try again" }).click();
-  await expect(dialog.getByRole("button", { name: /QEI-TEST-0001/ })).toBeVisible();
-  await dialog.getByLabel("Search medicines or invoices").press("ArrowDown");
-  await expect(dialog.getByRole("button", { name: /QEI-TEST-0001/ })).toBeFocused();
+  await expect(input).toBeFocused();
+  await input.fill("Q");
+  await expect(scope.getByRole("alert")).toContainText("Search could not load");
+  await scope.getByRole("button", { name: "Try again" }).click();
+  const result = scope.getByRole("button", { name: /QEI-TEST-0001/ });
+  await expect(result).toBeVisible();
+  await input.press("ArrowDown");
+  await expect(result).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByText(sale.invoice_number, { exact: true })).toBeVisible();
 });

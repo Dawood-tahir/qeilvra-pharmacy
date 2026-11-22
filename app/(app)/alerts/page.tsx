@@ -23,7 +23,6 @@ type AlertItem = {
 
 const tabs = [
   { id: "low_stock", label: "Low Stock" },
-  { id: "out_of_stock", label: "Out of Stock" },
   { id: "expiring", label: "Expiring" },
 ];
 
@@ -48,6 +47,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
         {tabs.map((tab) => (
           <Link key={tab.id} aria-current={selected === tab.id ? "page" : undefined} href={`/alerts?filter=${tab.id}`} className={cn("shrink-0 rounded-xl border px-4 py-2.5 text-sm font-semibold", selected === tab.id ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-600")}>{tab.label}</Link>
         ))}
+        <Link href="/medicines?filter=out_of_stock" className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600">View Out-of-Stock Inventory</Link>
       </div>
       <RecordSearchScope key={selected} complete query={query}><HistorySearch action="/alerts" query={query} label="Search stock alerts" filters={{ filter: selected }} /><Card className="mt-4">
         <CardContent className="p-0"><RecordSearchResults empty={<EmptyState icon={PackageX} title="Nothing needs attention" description="There are no medicines in this alert category." />} rows={items.map((item) => ({ id: item.medicine_id, fields: [item.medicine_name, [item.medicine_name, item.strength].filter(Boolean).join(' '), item.sku], content: (

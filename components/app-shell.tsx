@@ -2,22 +2,21 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LayoutDashboard, ShoppingCart, Pill, Boxes, Truck, ContactRound, BarChart3,
-  WalletCards, Users, Settings, Bell, Search, X, LogOut,
+  WalletCards, Users, Settings, Bell, X, LogOut,
   AlertTriangle, MoreHorizontal, RotateCcw, Menu,
   ScrollText, ReceiptText,
 } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
-import { DialogLoading } from "@/components/ui/dialog-loading";
+import { GlobalSearch } from "@/components/global-search";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { cn, getInitials } from "@/lib/utils";
 import type { StaffUser } from "@/lib/auth";
 
 type NavItem = { label: string; href: string; icon: typeof LayoutDashboard };
-const GlobalSearch = lazy(() => import("@/components/global-search").then(module => ({ default: module.GlobalSearch })));
 
 const ownerNav: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -53,7 +52,6 @@ const salespersonNav: NavItem[] = [
 export function AppShell({ staff, children }: { staff: StaffUser; children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [searchOpen, setSearchOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -92,7 +90,6 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setSearchOpen(true); }
       if (!typing && event.key === "F2") { event.preventDefault(); router.push("/pos"); }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -117,15 +114,12 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
 
       <div className="min-w-0 lg:col-start-2">
         <header className="q-topbar no-print sticky top-0 z-30 border-b border-slate-200/80">
-          <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:h-[72px] lg:px-8">
+          <div className="flex h-16 items-center gap-2 px-3 sm:gap-3 sm:px-6 lg:h-[72px] lg:px-8">
             <Button variant="ghost" size="icon" className="shrink-0 lg:hidden" aria-label="Open navigation menu" aria-expanded={mobileOpen} aria-controls="mobile-sidebar" onClick={() => { setClosing(false); setMobileOpen(true); }}><Menu /></Button><div className="lg:hidden"><BrandMark compact /></div>
-            <button onClick={() => setSearchOpen(true)} className="q-shell-search hidden h-11 max-w-xl flex-1 items-center gap-3 rounded-xl border border-blue-100 bg-white/75 px-4 text-left text-sm text-slate-600 hover:border-blue-300 hover:bg-white sm:flex">
-              <Search className="size-4" /><span className="truncate">Search medicines, invoices…</span><kbd className="ml-auto rounded border bg-white px-2 py-0.5 text-[10px] text-slate-400">Ctrl K</kbd>
-            </button>
-            <button onClick={() => setSearchOpen(true)} className="ml-auto grid size-10 place-items-center rounded-xl text-slate-600 hover:bg-slate-100 sm:hidden" aria-label="Search"><Search /></button>
+            <GlobalSearch key={staff.id + ":" + staff.role} />
             <Link prefetch={pathname === "/pos" ? false : null} href="/notifications" className="relative grid size-10 place-items-center rounded-xl text-slate-600 hover:bg-slate-100" aria-label="Notifications"><Bell className="size-5" /></Link>
             <div className="hidden h-8 w-px bg-slate-200 sm:block" />
-            <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 min-[360px]:flex">
               <span className="grid size-9 place-items-center rounded-full bg-blue-600 text-xs font-bold text-white">{getInitials(staff.fullName)}</span>
               <span className="hidden sm:block"><span className="block max-w-32 truncate text-sm font-bold text-slate-900">{staff.fullName}</span><span className="block text-[11px] capitalize text-slate-500">{staff.role}</span></span>
             </div>
@@ -165,7 +159,6 @@ export function AppShell({ staff, children }: { staff: StaffUser; children: Reac
           <form action="/auth/signout" method="post" className="pt-4"><Button variant="ghost" className="w-full justify-start text-white hover:bg-white/10 hover:text-white"><LogOut /> Sign out</Button></form>
         </div>
       </Dialog>}
-      {searchOpen && <Suspense fallback={<DialogLoading label="Global search" onClose={() => setSearchOpen(false)} />}><GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} /></Suspense>}
     </div>
   );
 }
